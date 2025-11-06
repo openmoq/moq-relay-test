@@ -5,10 +5,9 @@
 #include <folly/logging/xlog.h>
 #include <folly/logging/Init.h>
 #include <folly/logging/LoggerDB.h>
-
+#include <folly/io/async/EventBaseThread.h>
 
 using namespace interop_test;
-
 
 int main (int argc, char* argv[]) {
     // Initialize Folly and logging
@@ -22,15 +21,31 @@ int main (int argc, char* argv[]) {
     auto& db = folly::LoggerDB::get();
     db.getCategory("")->setLevel(folly::LogLevel::DBG1, true);
 
-    std::cout << "Logging initialized - XLOG messages should be visible" << std::endl;    // Create PublishTest as a shared pointer since it uses shared_from_this()
-    auto test = std::make_shared<PublishTest>();    PublishTestConfig config;
+    std::cout << "Logging initialized - XLOG messages should be visible" << std::endl;
+
+    // Create EventBaseThread like debug_connection.cpp does
+    auto eventBaseThread = std::make_unique<folly::EventBaseThread>();
+
+    // Create PublishTest
+    auto test = std::make_shared<PublishTest>(eventBaseThread->getEventBase());
+
+    PublishTestConfig config;
     config.trackNamespace = "test";
     config.trackName = "interop-track";
+    // Try with proper WebTransport URL format
     config.serverUrl = "https://localhost:4433/moq";
 
     std::cout << "Running Interop Publish Test...\n";
 
-    auto result = test->runTest(config);
+    TestResult result = TestResult::ERROR;
+
+    try {
+        // Run the test using blockingWait like debug_connection.cpp
+        result = test->runTest(config);
+    } catch (const std::exception& ex) {
+        std::cout << "Exception in test: " << ex.what() << std::endl;
+        result = TestResult::ERROR;
+    }
 
     switch (result) {
         case TestResult::PASS:

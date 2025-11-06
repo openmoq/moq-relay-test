@@ -64,21 +64,79 @@ find_library(DOUBLE_CONVERSION_LIB double-conversion PATHS ${DOUBLE_CONVERSION_D
 # Find additional libraries that might be needed
 find_library(SSL_LIB ssl PATHS ${OPENSSL_DIR}/lib NO_DEFAULT_PATH)
 find_library(CRYPTO_LIB crypto PATHS ${OPENSSL_DIR}/lib NO_DEFAULT_PATH)
-find_library(ZSTD_LIB zstd PATHS ${ZSTD_DIR}/lib NO_DEFAULT_PATH)
-find_library(LZ4_LIB lz4 PATHS ${DEPS_BASE_DIR}/lz4-*/lib NO_DEFAULT_PATH)
+
+# Find lz4 library with more flexible pattern matching
+file(GLOB LZ4_DIRS "${DEPS_BASE_DIR}/lz4*")
+set(LZ4_LIB "")
+foreach(LZ4_CANDIDATE_DIR ${LZ4_DIRS})
+    find_library(LZ4_LIB_CANDIDATE lz4 PATHS ${LZ4_CANDIDATE_DIR}/lib NO_DEFAULT_PATH)
+    if(LZ4_LIB_CANDIDATE)
+        set(LZ4_LIB ${LZ4_LIB_CANDIDATE})
+        message(STATUS "Found lz4 library: ${LZ4_LIB}")
+        break()
+    endif()
+    unset(LZ4_LIB_CANDIDATE CACHE)
+endforeach()
+
+if(NOT LZ4_LIB)
+    message(WARNING "lz4 library not found in dependencies, trying system-wide")
+    find_library(LZ4_LIB lz4)
+endif()
+
+# Find zstd library with more flexible pattern matching
+file(GLOB ZSTD_DIRS "${DEPS_BASE_DIR}/zstd*")
+set(ZSTD_LIB "")
+foreach(ZSTD_CANDIDATE_DIR ${ZSTD_DIRS})
+    find_library(ZSTD_LIB_CANDIDATE zstd PATHS ${ZSTD_CANDIDATE_DIR}/lib NO_DEFAULT_PATH)
+    if(ZSTD_LIB_CANDIDATE)
+        set(ZSTD_LIB ${ZSTD_LIB_CANDIDATE})
+        message(STATUS "Found zstd library: ${ZSTD_LIB}")
+        break()
+    endif()
+    unset(ZSTD_LIB_CANDIDATE CACHE)
+endforeach()
+
+if(NOT ZSTD_LIB)
+    message(WARNING "zstd library not found in dependencies, trying system-wide")
+    find_library(ZSTD_LIB zstd)
+endif()
 
 # Find crypto libraries dynamically
 file(GLOB LIBSODIUM_DIRS "${DEPS_BASE_DIR}/libsodium-*")
 file(GLOB LIBOQS_DIRS "${DEPS_BASE_DIR}/liboqs-*")
 
-if(LIBSODIUM_DIRS)
-    list(GET LIBSODIUM_DIRS 0 LIBSODIUM_DIR)
-    find_library(SODIUM_LIB sodium PATHS ${LIBSODIUM_DIR}/lib NO_DEFAULT_PATH)
+# Find libsodium library with better error handling
+set(SODIUM_LIB "")
+foreach(LIBSODIUM_CANDIDATE_DIR ${LIBSODIUM_DIRS})
+    find_library(SODIUM_LIB_CANDIDATE sodium PATHS ${LIBSODIUM_CANDIDATE_DIR}/lib NO_DEFAULT_PATH)
+    if(SODIUM_LIB_CANDIDATE)
+        set(SODIUM_LIB ${SODIUM_LIB_CANDIDATE})
+        message(STATUS "Found sodium library: ${SODIUM_LIB}")
+        break()
+    endif()
+    unset(SODIUM_LIB_CANDIDATE CACHE)
+endforeach()
+
+if(NOT SODIUM_LIB)
+    message(WARNING "libsodium library not found in dependencies, trying system-wide")
+    find_library(SODIUM_LIB sodium)
 endif()
 
-if(LIBOQS_DIRS)
-    list(GET LIBOQS_DIRS 0 LIBOQS_DIR)
-    find_library(OQS_LIB oqs PATHS ${LIBOQS_DIR}/lib NO_DEFAULT_PATH)
+# Find liboqs library with better error handling
+set(OQS_LIB "")
+foreach(LIBOQS_CANDIDATE_DIR ${LIBOQS_DIRS})
+    find_library(OQS_LIB_CANDIDATE oqs PATHS ${LIBOQS_CANDIDATE_DIR}/lib NO_DEFAULT_PATH)
+    if(OQS_LIB_CANDIDATE)
+        set(OQS_LIB ${OQS_LIB_CANDIDATE})
+        message(STATUS "Found oqs library: ${OQS_LIB}")
+        break()
+    endif()
+    unset(OQS_LIB_CANDIDATE CACHE)
+endforeach()
+
+if(NOT OQS_LIB)
+    message(WARNING "liboqs library not found in dependencies, trying system-wide")
+    find_library(OQS_LIB oqs)
 endif()
 
 # Find boost libraries
@@ -99,6 +157,7 @@ set(MOXYGEN_SOURCES
 add_executable(interop_test_runner
     main.cpp
     PublishTest.cpp
+    moq_utils.cpp
     ${MOXYGEN_SOURCES}
 )
 
@@ -114,10 +173,17 @@ target_include_directories(interop_test_runner PRIVATE
     ${BOOST_DIR}/include
     ${DOUBLE_CONVERSION_DIR}/include
     ${OPENSSL_DIR}/include
-    ${ZSTD_DIR}/include
     ${LZ4_DIR}/include
     ${LIBEVENT_DIR}/include
 )
+
+# Add zstd include directory dynamically
+foreach(ZSTD_CANDIDATE_DIR ${ZSTD_DIRS})
+    if(EXISTS ${ZSTD_CANDIDATE_DIR}/include)
+        target_include_directories(interop_test_runner PRIVATE ${ZSTD_CANDIDATE_DIR}/include)
+        break()
+    endif()
+endforeach()
 
 # Find additional include directories
 target_include_directories(interop_test_runner PRIVATE
@@ -162,6 +228,92 @@ target_link_libraries(interop_test_runner
     c++abi
 )
 
+
+
 set_target_properties(interop_test_runner PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
+# Add debug connection test
+add_executable(debug_connection
+    debug_connection.cpp
+    moq_utils.cpp
+    ${MOXYGEN_SOURCES}
+)
+target_include_directories(debug_connection PRIVATE
+    ${MOXYGEN_DIR}
+    ${MOXYGEN_INSTALL_DIR}/include
+    ${DEPS_BASE_DIR}/folly/include
+    ${DEPS_BASE_DIR}/proxygen/include
+    ${DEPS_BASE_DIR}/wangle/include
+    ${DEPS_BASE_DIR}/fizz/include
+    ${DEPS_BASE_DIR}/mvfst/include
+    ${FMT_DIR}/include
+    ${GLOG_DIR}/include
+    ${GFLAGS_DIR}/include
+    ${BOOST_DIR}/include
+    ${DOUBLE_CONVERSION_DIR}/include
+    ${OPENSSL_DIR}/include
+    ${LZ4_DIR}/include
+    ${LIBEVENT_DIR}/include
+)
+
+# Add zstd include directory for debug_connection
+foreach(ZSTD_CANDIDATE_DIR ${ZSTD_DIRS})
+    if(EXISTS ${ZSTD_CANDIDATE_DIR}/include)
+        target_include_directories(debug_connection PRIVATE ${ZSTD_CANDIDATE_DIR}/include)
+        break()
+    endif()
+endforeach()
+
+# Add libsodium include directory
+foreach(LIBSODIUM_CANDIDATE_DIR ${LIBSODIUM_DIRS})
+    if(EXISTS ${LIBSODIUM_CANDIDATE_DIR}/include)
+        target_include_directories(debug_connection PRIVATE ${LIBSODIUM_CANDIDATE_DIR}/include)
+        break()
+    endif()
+endforeach()
+
+# Add liboqs include directory
+foreach(LIBOQS_CANDIDATE_DIR ${LIBOQS_DIRS})
+    if(EXISTS ${LIBOQS_CANDIDATE_DIR}/include)
+        target_include_directories(debug_connection PRIVATE ${LIBOQS_CANDIDATE_DIR}/include)
+        break()
+    endif()
+endforeach()
+
+target_link_libraries(debug_connection
+    ${MOXYGEN_LIB}
+    ${MOQRELAY_LIB}
+    ${MOQCACHE_LIB}
+    ${MLOGGER_LIB}
+    ${FLVPARSER_LIB}
+    ${MOQMI_LIB}
+    ${MVFST_LIBS}
+    ${PROXYGEN_LIB}
+    ${QUIC_WEBTRANSPORT_LIB}
+    ${WANGLE_LIB}
+    ${FIZZ_LIB}
+    ${FOLLY_LIB}
+    ${FMT_LIB}
+    ${GLOG_LIB}
+    ${GFLAGS_LIB}
+    ${DOUBLE_CONVERSION_LIB}
+    ${SSL_LIB}
+    ${CRYPTO_LIB}
+    ${ZSTD_LIB}
+    ${LZ4_LIB}
+    ${LIBEVENT_LIB}
+    ${BOOST_CONTEXT_LIB}
+    ${BOOST_SYSTEM_LIB}
+    ${BOOST_THREAD_LIB}
+    ${SODIUM_LIB}
+    ${OQS_LIB}
+    pthread
+    dl
+    c++abi
+)
+
+set_target_properties(debug_connection PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )

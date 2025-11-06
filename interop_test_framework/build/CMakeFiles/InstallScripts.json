@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/Users/akashn/Projects/openmoq/moq-relay-test/interop_test_framework/build/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
