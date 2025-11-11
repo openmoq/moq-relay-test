@@ -1,6 +1,8 @@
 #include "PublishTest.h"
 #include <iostream>
 #include <memory>
+#include <thread>
+#include <chrono>
 #include <folly/init/Init.h>
 #include <folly/logging/xlog.h>
 #include <folly/logging/Init.h>
@@ -10,18 +12,7 @@
 using namespace interop_test;
 
 int main (int argc, char* argv[]) {
-    // Initialize Folly and logging
     folly::Init init(&argc, &argv);
-
-    // Simple logging configuration that should work
-    // This will enable DBG1 level logging and output to stderr by default
-    folly::initLogging(".=DBG1");
-
-    // Also set specific categories to be more verbose
-    auto& db = folly::LoggerDB::get();
-    db.getCategory("")->setLevel(folly::LogLevel::DBG1, true);
-
-    std::cout << "Logging initialized - XLOG messages should be visible" << std::endl;
 
     // Create EventBaseThread like debug_connection.cpp does
     auto eventBaseThread = std::make_unique<folly::EventBaseThread>();

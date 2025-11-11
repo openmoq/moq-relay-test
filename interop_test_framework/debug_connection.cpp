@@ -9,25 +9,23 @@
 #include "moq_utils.h"
 
 std::unique_ptr<folly::EventBaseThread> globalEventBaseThread;
-
+// TODO: DELETE THIS
+// Just testing things out
 folly::coro::Task<void> testConnection() {
     std::shared_ptr<moxygen::MoQClient> client = nullptr;
     try {
         std::cout << "Creating event base..." << std::endl;
 
-        // Create a dedicated event base thread for proper cleanup
         globalEventBaseThread = std::make_unique<folly::EventBaseThread>();
 
         std::cout << "Setting up MoQ session..." << std::endl;
 
-        // Use the utility function to create the MoQ session
         client = co_await moq_utils::createMoQSessionWithStubHandlers(
             globalEventBaseThread->getEventBase(),
             "https://localhost:4433/moq");
 
         std::cout << "Connection successful!" << std::endl;
 
-        // Let the connection stay alive a bit to test the cleanup properly
         std::cout << "Keeping connection alive for 5 seconds..." << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(5000));
 
@@ -37,7 +35,6 @@ folly::coro::Task<void> testConnection() {
         std::cout << "Connection failed: " << ex.what() << std::endl;
     }
 
-    // Explicit cleanup to avoid race conditions
     if (client) {
         std::cout << "Cleaning up client..." << std::endl;
         client.reset();
@@ -54,7 +51,6 @@ folly::coro::Task<void> testConnection() {
 
 int main(int argc, char* argv[]) {
     folly::Init init(&argc, &argv);
-    folly::initLogging(".=DBG3");
 
     std::cout << "Starting debug connection test..." << std::endl;
 
