@@ -6,13 +6,13 @@
 #include <chrono>
 #include <memory>
 #include <thread>
-#include "moq_utils.h"
+#include "moq_interface.h"
 
 std::unique_ptr<folly::EventBaseThread> globalEventBaseThread;
 // TODO: DELETE THIS
 // Just testing things out
 folly::coro::Task<void> testConnection() {
-    std::shared_ptr<moxygen::MoQClient> client = nullptr;
+    std::shared_ptr<moq_interface::MoQInterface> moqInterface = nullptr;
     try {
         std::cout << "Creating event base..." << std::endl;
 
@@ -20,9 +20,15 @@ folly::coro::Task<void> testConnection() {
 
         std::cout << "Setting up MoQ session..." << std::endl;
 
-        client = co_await moq_utils::createMoQSessionWithStubHandlers(
-            globalEventBaseThread->getEventBase(),
-            "https://localhost:4433/moq");
+        moqInterface = std::make_shared<moq_interface::MoQInterface>(
+            globalEventBaseThread->getEventBase());
+        
+        bool connected = co_await moqInterface->connect("https://localhost:4433/moq");
+        
+        if (!connected) {
+            std::cout << "Connection failed!" << std::endl;
+            co_return;
+        }
 
         std::cout << "Connection successful!" << std::endl;
 
@@ -35,10 +41,10 @@ folly::coro::Task<void> testConnection() {
         std::cout << "Connection failed: " << ex.what() << std::endl;
     }
 
-    if (client) {
-        std::cout << "Cleaning up client..." << std::endl;
-        client.reset();
-        std::cout << "Client cleaned up" << std::endl;
+    if (moqInterface) {
+        std::cout << "Cleaning up MoQ interface..." << std::endl;
+        moqInterface.reset();
+        std::cout << "MoQ interface cleaned up" << std::endl;
 
         // Give time for async cleanup to complete
         std::this_thread::sleep_for(std::chrono::milliseconds(500));

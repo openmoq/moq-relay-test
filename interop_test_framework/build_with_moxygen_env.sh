@@ -11,6 +11,7 @@ cd "$PROJECT_ROOT/moqt_implementation/moxygen"
 eval "$(./build/fbcode_builder/getdeps.py env moxygen)"
 
 # Now build the interop test framework
+mkdir -p "$PROJECT_ROOT/interop_test_framework/build"
 cd "$PROJECT_ROOT/interop_test_framework/build"
 
 # Build with the current CMakeLists.txt using moxygen environment

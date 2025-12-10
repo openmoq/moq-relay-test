@@ -6,11 +6,8 @@
 #include <folly/coro/Task.h>
 #include <folly/coro/BlockingWait.h>
 #include <folly/io/async/EventBase.h>
-#include <moxygen/MoQClient.h>
-#include <moxygen/MoQSession.h>
-#include <moxygen/MoQFramer.h>
 #include <moxygen/Publisher.h>
-#include "moq_utils.h"
+#include "moq_interface.h"
 
 namespace interop_test {
 
@@ -60,12 +57,10 @@ public:
 
 private:
     std::string lastError_;
-    std::shared_ptr<moxygen::MoQClient> client_;
+    std::shared_ptr<moq_interface::MoQInterface> moqInterface_;
     std::shared_ptr<TestSubscriptionHandle> subscriptionHandle_;
     folly::EventBase* eventBase_;
 
-    folly::coro::Task<bool> establishSession(const std::string& serverUrl);
-    folly::coro::Task<bool> sendPublishRequest(const PublishTestConfig& config);
     void cleanup();
 };
 }

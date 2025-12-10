@@ -156,8 +156,9 @@ set(MOXYGEN_SOURCES
 
 add_executable(interop_test_runner
     main.cpp
+    TestSuite.cpp
     PublishTest.cpp
-    moq_utils.cpp
+    moq_interface.cpp
     ${MOXYGEN_SOURCES}
 )
 
@@ -237,7 +238,7 @@ set_target_properties(interop_test_runner PROPERTIES
 # Add debug connection test
 add_executable(debug_connection
     debug_connection.cpp
-    moq_utils.cpp
+    moq_interface.cpp
     ${MOXYGEN_SOURCES}
 )
 target_include_directories(debug_connection PRIVATE
