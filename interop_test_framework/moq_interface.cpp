@@ -114,4 +114,56 @@ folly::coro::Task<bool> MoQInterface::publish(
     }
 }
 
+folly::coro::Task<bool> MoQInterface::subscribe(
+    const std::string& trackNamespace,
+    const std::string& trackName,
+    std::shared_ptr<moxygen::TrackConsumer> trackConsumer,
+    uint8_t priority,
+    moxygen::GroupOrder groupOrder) {
+    
+    try {
+        if (!isConnected()) {
+            std::cerr << "No MoQ session available" << std::endl;
+            co_return false;
+        }
+
+        if (!trackConsumer) {
+            std::cerr << "TrackConsumer cannot be null" << std::endl;
+            co_return false;
+        }
+
+        auto session = client_->moqSession_;
+
+        // Create subscribe request
+        moxygen::SubscribeRequest subscribeReq = moxygen::SubscribeRequest::make(
+            moxygen::FullTrackName{
+                .trackNamespace = moxygen::TrackNamespace(std::vector<std::string>{trackNamespace}),
+                .trackName = trackName
+            },
+            priority,
+            groupOrder
+        );
+
+        std::cout << "Sending subscribe request for track: "
+                  << trackNamespace << "/" << trackName << std::endl;
+
+        // Send subscribe request via session's subscribe method
+        auto subscribeResult = co_await session->subscribe(subscribeReq, trackConsumer);
+
+        if (subscribeResult.hasValue()) {
+            auto subscriptionHandle = std::move(subscribeResult.value());
+            std::cout << "Subscribe OK received. Track alias: "
+                      << subscriptionHandle->subscribeOk().trackAlias.value << std::endl;
+            co_return true;
+        } else {
+            auto error = subscribeResult.error();
+            std::cerr << "Subscribe failed: " << error.reasonPhrase << std::endl;
+            co_return false;
+        }
+    } catch (const std::exception& ex) {
+        std::cerr << "Exception in subscribe: " << ex.what() << std::endl;
+        co_return false;
+    }
+}
+
 } // namespace moq_interface

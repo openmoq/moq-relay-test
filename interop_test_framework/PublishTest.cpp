@@ -1,7 +1,7 @@
 #include "PublishTest.h"
-#include <iostream>
-#include <thread>
 #include <chrono>
+#include <thread>
+#include <folly/coro/BlockingWait.h>
 
 namespace interop_test {
 

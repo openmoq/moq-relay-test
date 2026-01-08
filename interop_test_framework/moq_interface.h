@@ -49,6 +49,23 @@ public:
         const std::string& trackName,
         std::shared_ptr<moxygen::SubscriptionHandle> subscriptionHandle = nullptr);
 
+
+    /**
+     * Subscribes to a track on the MoQ relay
+     * @param trackNamespace The track namespace
+     * @param trackName The track name
+     * @param trackConsumer Callback to receive track data
+     * @param priority Subscribe priority (default: 128)
+     * @param groupOrder Group ordering preference (default: Default)
+     * @return Task that resolves to true on success
+     */
+    folly::coro::Task<bool> subscribe(
+        const std::string& trackNamespace,
+        const std::string& trackName,
+        std::shared_ptr<moxygen::TrackConsumer> trackConsumer,
+        uint8_t priority = 128,
+        moxygen::GroupOrder groupOrder = moxygen::GroupOrder::OldestFirst);
+
     /**
      * Get the underlying MoQ client (for advanced usage)
      */

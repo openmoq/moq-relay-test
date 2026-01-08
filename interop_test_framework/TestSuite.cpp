@@ -13,6 +13,7 @@ bool TestSuite::runAll(const TestSuiteConfig& config) {
 
     // Run all tests
     runPublishTest(config);
+    runSubscribeTest(config);
 
     // Print summary
     printSummary();
@@ -45,6 +46,34 @@ bool TestSuite::runPublishTest(const TestSuiteConfig& config) {
     }
 
     recordResult("PublishTest", result, error);
+    return result == TestResult::PASS;
+}
+
+bool TestSuite::runSubscribeTest(const TestSuiteConfig& config) {
+    std::cout << "Running Subscribe Test...\n";
+
+    auto test = std::make_shared<SubscribeTest>(eventBase_);
+
+    SubscribeTestConfig subscribeConfig;
+    subscribeConfig.trackNamespace = "test";
+    subscribeConfig.trackName = "interop-track";
+    subscribeConfig.serverUrl = config.relayUrl;
+
+    TestResult result = TestResult::ERROR;
+
+    try {
+        result = test->runTest(subscribeConfig);
+    } catch (const std::exception& ex) {
+        std::cout << "Exception in Subscribe Test: " << ex.what() << std::endl;
+        result = TestResult::ERROR;
+    }
+
+    std::string error;
+    if (result != TestResult::PASS) {
+        error = test->getLastError();
+    }
+
+    recordResult("SubscribeTest", result, error);
     return result == TestResult::PASS;
 }
 

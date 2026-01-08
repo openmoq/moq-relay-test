@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PublishTest.h"
+#include "SubscribeTest.h"
 #include <memory>
 #include <vector>
 #include <string>
@@ -22,6 +23,7 @@ public:
 
     // Run individual tests
     bool runPublishTest(const TestSuiteConfig& config);
+    bool runSubscribeTest(const TestSuiteConfig& config);
 
     // Get summary of results
     void printSummary() const;

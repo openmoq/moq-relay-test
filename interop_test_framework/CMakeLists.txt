@@ -158,6 +158,7 @@ add_executable(interop_test_runner
     main.cpp
     TestSuite.cpp
     PublishTest.cpp
+    SubscribeTest.cpp
     moq_interface.cpp
     ${MOXYGEN_SOURCES}
 )
