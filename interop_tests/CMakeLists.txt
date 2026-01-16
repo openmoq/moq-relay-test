@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(interop_test_framework)
+project(interop_tests)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -158,8 +158,9 @@ add_executable(interop_test_runner
     main.cpp
     TestSuite.cpp
     TestRegistry.cpp
-    PublishTest.cpp
-    SubscribeTest.cpp
+    publisher_tests/publish_test.cpp
+    subscriber_tests/subscribe_test.cpp
+    subscriber_tests/subscribe_error_test.cpp
     moq_interface.cpp
     base/BaseTest.cpp
     base/TestFixture.cpp
@@ -168,6 +169,7 @@ add_executable(interop_test_runner
 
 # Include moxygen and dependency headers
 target_include_directories(interop_test_runner PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}    
     ${MOXYGEN_DIR}
     ${MOXYGEN_INSTALL_DIR}/include
     ${DEPS_BASE_DIR}/folly/include
@@ -233,92 +235,6 @@ target_link_libraries(interop_test_runner
     c++abi
 )
 
-
-
 set_target_properties(interop_test_runner PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
-
-# Add debug connection test
-add_executable(debug_connection
-    debug_connection.cpp
-    moq_interface.cpp
-    ${MOXYGEN_SOURCES}
-)
-target_include_directories(debug_connection PRIVATE
-    ${MOXYGEN_DIR}
-    ${MOXYGEN_INSTALL_DIR}/include
-    ${DEPS_BASE_DIR}/folly/include
-    ${DEPS_BASE_DIR}/proxygen/include
-    ${DEPS_BASE_DIR}/wangle/include
-    ${DEPS_BASE_DIR}/fizz/include
-    ${DEPS_BASE_DIR}/mvfst/include
-    ${FMT_DIR}/include
-    ${GLOG_DIR}/include
-    ${GFLAGS_DIR}/include
-    ${BOOST_DIR}/include
-    ${DOUBLE_CONVERSION_DIR}/include
-    ${OPENSSL_DIR}/include
-    ${LZ4_DIR}/include
-    ${LIBEVENT_DIR}/include
-)
-
-# Add zstd include directory for debug_connection
-foreach(ZSTD_CANDIDATE_DIR ${ZSTD_DIRS})
-    if(EXISTS ${ZSTD_CANDIDATE_DIR}/include)
-        target_include_directories(debug_connection PRIVATE ${ZSTD_CANDIDATE_DIR}/include)
-        break()
-    endif()
-endforeach()
-
-# Add libsodium include directory
-foreach(LIBSODIUM_CANDIDATE_DIR ${LIBSODIUM_DIRS})
-    if(EXISTS ${LIBSODIUM_CANDIDATE_DIR}/include)
-        target_include_directories(debug_connection PRIVATE ${LIBSODIUM_CANDIDATE_DIR}/include)
-        break()
-    endif()
-endforeach()
-
-# Add liboqs include directory
-foreach(LIBOQS_CANDIDATE_DIR ${LIBOQS_DIRS})
-    if(EXISTS ${LIBOQS_CANDIDATE_DIR}/include)
-        target_include_directories(debug_connection PRIVATE ${LIBOQS_CANDIDATE_DIR}/include)
-        break()
-    endif()
-endforeach()
-
-target_link_libraries(debug_connection
-    ${MOXYGEN_LIB}
-    ${MOQRELAY_LIB}
-    ${MOQCACHE_LIB}
-    ${MLOGGER_LIB}
-    ${FLVPARSER_LIB}
-    ${MOQMI_LIB}
-    ${MVFST_LIBS}
-    ${PROXYGEN_LIB}
-    ${QUIC_WEBTRANSPORT_LIB}
-    ${WANGLE_LIB}
-    ${FIZZ_LIB}
-    ${FOLLY_LIB}
-    ${FMT_LIB}
-    ${GLOG_LIB}
-    ${GFLAGS_LIB}
-    ${DOUBLE_CONVERSION_LIB}
-    ${SSL_LIB}
-    ${CRYPTO_LIB}
-    ${ZSTD_LIB}
-    ${LZ4_LIB}
-    ${LIBEVENT_LIB}
-    ${BOOST_CONTEXT_LIB}
-    ${BOOST_SYSTEM_LIB}
-    ${BOOST_THREAD_LIB}
-    ${SODIUM_LIB}
-    ${OQS_LIB}
-    pthread
-    dl
-    c++abi
-)
-
-set_target_properties(debug_connection PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
