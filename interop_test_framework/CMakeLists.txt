@@ -157,9 +157,12 @@ set(MOXYGEN_SOURCES
 add_executable(interop_test_runner
     main.cpp
     TestSuite.cpp
+    TestRegistry.cpp
     PublishTest.cpp
     SubscribeTest.cpp
     moq_interface.cpp
+    base/BaseTest.cpp
+    base/TestFixture.cpp
     ${MOXYGEN_SOURCES}
 )
 

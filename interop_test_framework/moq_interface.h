@@ -56,7 +56,7 @@ public:
      * @param trackName The track name
      * @param trackConsumer Callback to receive track data
      * @param priority Subscribe priority (default: 128)
-     * @param groupOrder Group ordering preference (default: Default)
+     * @param groupOrder Group ordering preference (default: OldestFirst)
      * @return Task that resolves to true on success
      */
     folly::coro::Task<bool> subscribe(
@@ -66,14 +66,8 @@ public:
         uint8_t priority = 128,
         moxygen::GroupOrder groupOrder = moxygen::GroupOrder::OldestFirst);
 
-    /**
-     * Get the underlying MoQ client (for advanced usage)
-     */
     std::shared_ptr<moxygen::MoQClient> getClient() const { return client_; }
-
-    /**
-     * Check if connected
-     */
+    
     bool isConnected() const { return client_ && client_->moqSession_; }
 
 private:

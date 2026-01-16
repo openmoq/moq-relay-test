@@ -1,7 +1,7 @@
 #pragma once
 
-#include "PublishTest.h"
-#include "SubscribeTest.h"
+#include "TestRegistry.h"
+#include "base/BaseTest.h"
 #include <memory>
 #include <vector>
 #include <string>
@@ -11,6 +11,7 @@ namespace interop_test {
 
 struct TestSuiteConfig {
     std::string relayUrl{"https://localhost:4433/moq"};
+    TestCategory category{TestCategory::ALL}; // Run tests from specific category
 };
 
 class TestSuite {
@@ -18,12 +19,11 @@ public:
     explicit TestSuite(folly::EventBase* eventBase);
     ~TestSuite() = default;
 
-    // Run all tests in the suite
+    // Run all tests in the suite (or by category)
     bool runAll(const TestSuiteConfig& config);
 
-    // Run individual tests
-    bool runPublishTest(const TestSuiteConfig& config);
-    bool runSubscribeTest(const TestSuiteConfig& config);
+    // Run a specific test by name
+    bool runTest(const std::string& testName, const TestContext& context);
 
     // Get summary of results
     void printSummary() const;

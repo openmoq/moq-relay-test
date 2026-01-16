@@ -1,26 +1,16 @@
 #pragma once
 
-#include <chrono>
 #include <cstdint>
-#include <iostream>
 #include <memory>
 #include <string>
 #include <folly/Expected.h>
 #include <folly/Unit.h>
 #include <folly/futures/Future.h>
-#include <folly/io/async/EventBase.h>
 #include <moxygen/MoQConsumers.h>
-#include "moq_interface.h"
+#include "base/BaseTest.h"
 #include "TestCommon.h"
 
 namespace interop_test {
-
-struct SubscribeTestConfig {
-    std::string trackNamespace{"test"};
-    std::string trackName{"test-track"};
-    std::chrono::milliseconds timeout{5000};
-    std::string serverUrl{"https://localhost:4433/moq"};
-};
 
 // Simple TrackConsumer implementation for testing
 class TestTrackConsumer : public moxygen::TrackConsumer {
@@ -49,33 +39,34 @@ public:
     folly::Expected<folly::Unit, moxygen::MoQPublishError> groupNotExists(
         uint64_t groupID,
         uint64_t subgroup,
-        moxygen::Priority pri,
-        moxygen::Extensions extensions) override;
+        moxygen::Priority pri) override;
 
     folly::Expected<folly::Unit, moxygen::MoQPublishError> subscribeDone(
         moxygen::SubscribeDone subDone) override;
 };
 
-class SubscribeTest {
+/**
+ * Basic subscribe test - verifies that a client can subscribe to a published track
+ */
+class SubscribeTest : public BaseTest {
 public:
-    SubscribeTest(folly::EventBase* eventBase) : eventBase_(eventBase) {}
+    explicit SubscribeTest(const TestContext& context);
+    ~SubscribeTest() override = default;
 
-    // Destructor to ensure proper cleanup
-    ~SubscribeTest() {
-        cleanup();
+    // BaseTest interface
+    std::string getName() const override { return "SubscribeTest"; }
+    std::string getDescription() const override {
+        return "Verifies that a client can subscribe to a published track via the relay";
     }
+    TestCategory getCategory() const override { return TestCategory::ALL; }
 
-    TestResult runTest(const SubscribeTestConfig& config);
-    std::string getLastError() const { return lastError_; }
+protected:
+    TestResult execute() override;
 
 private:
-    std::string lastError_;
-    std::shared_ptr<moq_interface::MoQInterface> publisherInterface_;
-    std::shared_ptr<moq_interface::MoQInterface> subscriberInterface_;
-    std::shared_ptr<TestSubscriptionHandle> subscriptionHandle_;
+    std::string trackNamespace_{"test"};
+    std::string trackName_{"interop-track"};
     std::shared_ptr<TestTrackConsumer> trackConsumer_;
-    folly::EventBase* eventBase_;
-
-    void cleanup();
 };
-}
+
+} // namespace interop_test

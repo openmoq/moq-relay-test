@@ -1,5 +1,7 @@
 #include "TestSuite.h"
+#include "base/BaseTest.h"
 #include <iostream>
+#include <algorithm>
 
 namespace interop_test {
 
@@ -11,70 +13,59 @@ bool TestSuite::runAll(const TestSuiteConfig& config) {
     std::cout << "=== Running MoQ Interop Test Suite ===\n";
     std::cout << "Relay URL: " << config.relayUrl << "\n\n";
 
-    // Run all tests
-    runPublishTest(config);
-    runSubscribeTest(config);
+    // Create test context
+    TestContext testContext(config.relayUrl, eventBase_);
+    testContext.verbose = false;
+
+    // Get tests from registry
+    auto tests = TestRegistry::instance().getTestsByCategory(config.category);
+    
+    if (tests.empty()) {
+        std::cout << "No tests found in registry!\n";
+        return false;
+    }
+
+    std::cout << "Found " << tests.size() << " test(s) to run\n\n";
+
+    // Run all registered tests
+    bool allPassed = true;
+    for (const auto& testInfo : tests) {
+        bool passed = runTest(testInfo.name, testContext);
+        allPassed = allPassed && passed;
+    }
 
     // Print summary
     printSummary();
 
-    return failedTests_ == 0;
+    return allPassed;
 }
 
-bool TestSuite::runPublishTest(const TestSuiteConfig& config) {
-    std::cout << "Running Publish Test...\n";
-
-    auto test = std::make_shared<PublishTest>(eventBase_);
-
-    PublishTestConfig publishConfig;
-    publishConfig.trackNamespace = "test";
-    publishConfig.trackName = "interop-track";
-    publishConfig.serverUrl = config.relayUrl;
-
-    TestResult result = TestResult::ERROR;
+bool TestSuite::runTest(const std::string& testName, const TestContext& context) {
+    std::cout << "\n=== Running Test: " << testName << " ===\n";
 
     try {
-        result = test->runTest(publishConfig);
-    } catch (const std::exception& ex) {
-        std::cout << "Exception in Publish Test: " << ex.what() << std::endl;
-        result = TestResult::ERROR;
+        auto test = TestRegistry::instance().createTest(testName, context);
+        
+        if (!test) {
+            recordResult(testName, TestResult::ERROR, "Failed to create test instance");
+            return false;
+        }
+        
+        std::cout << "Description: " << test->getDescription() << "\n";
+        
+        TestResult result = test->run();
+        
+        std::string error;
+        if (result != TestResult::PASS) {
+            error = test->getLastError();
+        }
+
+        recordResult(test->getName(), result, error);
+        return result == TestResult::PASS;
+    } catch (const std::exception& e) {
+        recordResult(testName, TestResult::ERROR, std::string("Exception: ") + e.what());
+        return false;
     }
-
-    std::string error;
-    if (result != TestResult::PASS) {
-        error = test->getLastError();
-    }
-
-    recordResult("PublishTest", result, error);
-    return result == TestResult::PASS;
-}
-
-bool TestSuite::runSubscribeTest(const TestSuiteConfig& config) {
-    std::cout << "Running Subscribe Test...\n";
-
-    auto test = std::make_shared<SubscribeTest>(eventBase_);
-
-    SubscribeTestConfig subscribeConfig;
-    subscribeConfig.trackNamespace = "test";
-    subscribeConfig.trackName = "interop-track";
-    subscribeConfig.serverUrl = config.relayUrl;
-
-    TestResult result = TestResult::ERROR;
-
-    try {
-        result = test->runTest(subscribeConfig);
-    } catch (const std::exception& ex) {
-        std::cout << "Exception in Subscribe Test: " << ex.what() << std::endl;
-        result = TestResult::ERROR;
-    }
-
-    std::string error;
-    if (result != TestResult::PASS) {
-        error = test->getLastError();
-    }
-
-    recordResult("SubscribeTest", result, error);
-    return result == TestResult::PASS;
 }
 
 void TestSuite::recordResult(const std::string& testName, TestResult result, const std::string& error) {

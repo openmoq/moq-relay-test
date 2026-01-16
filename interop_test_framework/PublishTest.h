@@ -1,41 +1,33 @@
 #pragma once
 
-#include <chrono>
-#include <iostream>
-#include <memory>
 #include <string>
-#include <folly/io/async/EventBase.h>
-#include <moxygen/Publisher.h>
-#include "moq_interface.h"
+#include <memory>
+#include "base/BaseTest.h"
 #include "TestCommon.h"
 
 namespace interop_test {
 
-struct PublishTestConfig {
-    std::string trackNamespace{"test"};
-    std::string trackName{"test-track"};
-    std::chrono::milliseconds timeout{5000};
-    std::string serverUrl{"https://localhost:4433/moq"};
-};
-
-class PublishTest {
+/**
+ * Basic publish test - verifies that a client can successfully publish a track to the relay
+ */
+class PublishTest : public BaseTest {
 public:
-    PublishTest(folly::EventBase* eventBase) : eventBase_(eventBase) {}
+    explicit PublishTest(const TestContext& context);
+    ~PublishTest() override = default;
 
-    // Destructor to ensure proper cleanup
-    ~PublishTest() {
-        cleanup();
+    // BaseTest interface
+    std::string getName() const override { return "PublishTest"; }
+    std::string getDescription() const override {
+        return "Verifies that a client can successfully publish a track to the relay";
     }
+    TestCategory getCategory() const override { return TestCategory::ALL; }
 
-    TestResult runTest(const PublishTestConfig& config);
-    std::string getLastError() const { return lastError_; }
+protected:
+    TestResult execute() override;
 
 private:
-    std::string lastError_;
-    std::shared_ptr<moq_interface::MoQInterface> moqInterface_;
-    std::shared_ptr<TestSubscriptionHandle> subscriptionHandle_;
-    folly::EventBase* eventBase_;
-
-    void cleanup();
+    std::string trackNamespace_{"test"};
+    std::string trackName_{"interop-track"};
 };
-}
+
+} // namespace interop_test

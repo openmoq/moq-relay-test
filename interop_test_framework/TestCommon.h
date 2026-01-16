@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <memory>
+#include <folly/coro/Task.h>
 #include <moxygen/Publisher.h>
 
 namespace interop_test {
@@ -25,9 +26,12 @@ public:
         std::cout << "TestSubscriptionHandle::unsubscribe() called" << std::endl;
     }
 
-    void subscribeUpdate(moxygen::SubscribeUpdate subUpdate) override {
+    folly::coro::Task<SubscribeUpdateResult> subscribeUpdate(moxygen::SubscribeUpdate subUpdate) override {
         std::cout << "TestSubscriptionHandle::subscribeUpdate() called with request ID: "
                   << subUpdate.requestID << std::endl;
+        
+        // Return a successful result
+        co_return moxygen::SubscribeUpdateOk{subUpdate.requestID};
     }
 };
 

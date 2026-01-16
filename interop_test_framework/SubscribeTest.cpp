@@ -1,9 +1,14 @@
 #include "SubscribeTest.h"
-#include <chrono>
+#include "base/TestFixture.h"
+#include "moq_interface.h"
+#include "TestRegistry.h"
 #include <thread>
 #include <folly/coro/BlockingWait.h>
 
 namespace interop_test {
+
+// Auto-register this test
+REGISTER_TEST(SubscribeTest);
 
 // TestTrackConsumer implementation
 
@@ -48,8 +53,7 @@ folly::Expected<folly::Unit, moxygen::MoQPublishError>
 TestTrackConsumer::groupNotExists(
     uint64_t groupID,
     uint64_t subgroup,
-    moxygen::Priority pri,
-    moxygen::Extensions extensions) {
+    moxygen::Priority pri) {
     std::cout << "TestTrackConsumer::groupNotExists - Group: " << groupID << std::endl;
     return folly::unit;
 }
@@ -62,153 +66,48 @@ TestTrackConsumer::subscribeDone(moxygen::SubscribeDone subDone) {
 
 // SubscribeTest implementation
 
-TestResult SubscribeTest::runTest(const SubscribeTestConfig& config) {
-    try {
-        std::cout << "Starting MOQ subscribe test for track: "
-                  << config.trackNamespace << "/" << config.trackName << std::endl;
-
-        // Step 1: Create publisher connection and send publish request
-        std::cout << "\n=== Step 1: Establishing publisher connection ===" << std::endl;
-        publisherInterface_ = std::make_shared<moq_interface::MoQInterface>(eventBase_);
-
-        bool publisherConnected = folly::coro::blockingWait(
-            publisherInterface_->connect(config.serverUrl));
-
-        if (!publisherConnected) {
-            lastError_ = "Failed to establish publisher MoQ session";
-            return TestResult::ERROR;
-        }
-
-        // Create subscription handle for publisher
-        if (!subscriptionHandle_) {
-            subscriptionHandle_ = std::make_shared<TestSubscriptionHandle>();
-        }
-
-        // Send publish request
-        std::cout << "Sending publish request..." << std::endl;
-        bool publishResult = folly::coro::blockingWait(
-            publisherInterface_->publish(
-                config.trackNamespace,
-                config.trackName,
-                subscriptionHandle_
-            )
-        );
-
-        if (!publishResult) {
-            lastError_ = "Publish request failed";
-            return TestResult::FAIL;
-        }
-
-        std::cout << "Publish request successful" << std::endl;
-
-        // Give the relay time to process the publish request
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        // Step 2: Create subscriber connection and subscribe
-        std::cout << "\n=== Step 2: Establishing subscriber connection ===" << std::endl;
-        subscriberInterface_ = std::make_shared<moq_interface::MoQInterface>(eventBase_);
-
-        bool subscriberConnected = folly::coro::blockingWait(
-            subscriberInterface_->connect(config.serverUrl));
-
-        if (!subscriberConnected) {
-            lastError_ = "Failed to establish subscriber MoQ session";
-            return TestResult::ERROR;
-        }
-
-        // Create track consumer
-        if (!trackConsumer_) {
-            trackConsumer_ = std::make_shared<TestTrackConsumer>();
-        }
-
-        // Subscribe to the track
-        std::cout << "Subscribing to track..." << std::endl;
-        bool subscribed = folly::coro::blockingWait(
-            subscriberInterface_->subscribe(
-                config.trackNamespace,
-                config.trackName,
-                trackConsumer_
-            )
-        );
-
-        if (!subscribed) {
-            lastError_ = "Failed to subscribe to track";
-            return TestResult::FAIL;
-        }
-
-        std::cout << "\nSubscribe test completed successfully" << std::endl;
-        std::cout << "Publisher and subscriber are using separate connections" << std::endl;
-        return TestResult::PASS;
-
-    } catch (const std::exception& ex) {
-        lastError_ = ex.what();
-        std::cout << "Subscribe test failed: " << lastError_ << std::endl;
-        return TestResult::ERROR;
-    }
+SubscribeTest::SubscribeTest(const TestContext& context)
+    : BaseTest(context)
+    , trackConsumer_(std::make_shared<TestTrackConsumer>()) {
 }
 
-void SubscribeTest::cleanup() {
-    std::cout << "Starting cleanup..." << std::endl;
+TestResult SubscribeTest::execute() {
+    log("Testing publish and subscribe for track: " + trackNamespace_ + "/" + trackName_);
 
-    // Clean up track consumer first
-    if (trackConsumer_) {
-        std::cout << "Cleaning up track consumer..." << std::endl;
-        trackConsumer_.reset();
-    }
+    // Step 1: Publish a track
+    log("Step 1: Publishing track");
+    auto publisher = fixture_->getPublisher();
+    assertNotNull(publisher.get(), "Publisher interface should not be null");
+    assertTrue(publisher->isConnected(), "Publisher should be connected");
 
-    // Clean up subscription handle
-    if (subscriptionHandle_) {
-        std::cout << "Cleaning up subscription handle..." << std::endl;
-        subscriptionHandle_.reset();
-    }
+    auto subscriptionHandle = fixture_->createSubscriptionHandle();
+    bool publishResult = folly::coro::blockingWait(publisher->publish(
+        trackNamespace_,
+        trackName_,
+        subscriptionHandle
+    ));
+    assertTrue(publishResult, "Publish request should succeed");
+    log("Publish successful");
 
-    // Clean up subscriber interface
-    if (subscriberInterface_) {
-        std::cout << "Cleaning up subscriber MoQ interface..." << std::endl;
-        try {
-            auto client = subscriberInterface_->getClient();
-            if (eventBase_ && client && client->moqSession_) {
-                eventBase_->runImmediatelyOrRunInEventBaseThreadAndWait([client]() {
-                    try {
-                        std::cout << "Closing subscriber MoQ session gracefully..." << std::endl;
-                        client->moqSession_->close(moxygen::SessionCloseErrorCode::NO_ERROR);
-                        std::cout << "Subscriber MoQ session closed" << std::endl;
-                    } catch (const std::exception& ex) {
-                        std::cout << "Exception during subscriber session close: " << ex.what() << std::endl;
-                    }
-                });
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-            subscriberInterface_.reset();
-        } catch (const std::exception& ex) {
-            std::cout << "Exception during subscriber cleanup: " << ex.what() << std::endl;
-        }
-    }
+    // Give the relay time to process the publish request
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    // Clean up publisher interface
-    if (publisherInterface_) {
-        std::cout << "Cleaning up publisher MoQ interface..." << std::endl;
-        try {
-            auto client = publisherInterface_->getClient();
-            if (eventBase_ && client && client->moqSession_) {
-                eventBase_->runImmediatelyOrRunInEventBaseThreadAndWait([client]() {
-                    try {
-                        std::cout << "Closing publisher MoQ session gracefully..." << std::endl;
-                        client->moqSession_->close(moxygen::SessionCloseErrorCode::NO_ERROR);
-                        std::cout << "Publisher MoQ session closed" << std::endl;
-                    } catch (const std::exception& ex) {
-                        std::cout << "Exception during publisher session close: " << ex.what() << std::endl;
-                    }
-                });
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-            publisherInterface_.reset();
-        } catch (const std::exception& ex) {
-            std::cout << "Exception during publisher cleanup: " << ex.what() << std::endl;
-        }
-    }
+    // Step 2: Subscribe to the track from a different connection
+    log("Step 2: Subscribing to track");
+    auto subscriber = fixture_->getSubscriber();
+    assertNotNull(subscriber.get(), "Subscriber interface should not be null");
+    assertTrue(subscriber->isConnected(), "Subscriber should be connected");
+    assertNotNull(trackConsumer_.get(), "Track consumer should not be null");
 
-    eventBase_ = nullptr;
-    std::cout << "Cleanup completed" << std::endl;
+    bool subscribed = folly::coro::blockingWait(subscriber->subscribe(
+        trackNamespace_,
+        trackName_,
+        trackConsumer_
+    ));
+    assertTrue(subscribed, "Subscribe request should succeed");
+    log("Subscribe successful");
+
+    log("Publisher and subscriber are using separate connections");
+    return TestResult::PASS;
 }
 } // namespace interop_test
