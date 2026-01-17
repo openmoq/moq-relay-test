@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 #include <folly/io/async/EventBase.h>
-#include "../TestCommon.h"
-#include "../moq_interface.h"
+#include "test_commons.h"
+#include "moq_interface.h"
 
 namespace interop_test {
 

@@ -1,5 +1,5 @@
-#include "TestSuite.h"
-#include "base/BaseTest.h"
+#include "test_suite.h"
+#include "base/base_test.h"
 #include <iostream>
 #include <algorithm>
 

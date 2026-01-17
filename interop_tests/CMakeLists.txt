@@ -154,21 +154,21 @@ set(MOXYGEN_SOURCES
     ${MOXYGEN_SRC_DIR}/util/QuicConnector.cpp
 )
 
-add_executable(interop_test_runner
+add_executable(interop_tests
     main.cpp
-    TestSuite.cpp
-    TestRegistry.cpp
+    test_suite.cpp
+    test_registry.cpp
     publisher_tests/publish_test.cpp
     subscriber_tests/subscribe_test.cpp
     subscriber_tests/subscribe_error_test.cpp
     moq_interface.cpp
-    base/BaseTest.cpp
-    base/TestFixture.cpp
+    base/base_test.cpp
+    base/test_fixture.cpp
     ${MOXYGEN_SOURCES}
 )
 
 # Include moxygen and dependency headers
-target_include_directories(interop_test_runner PRIVATE
+target_include_directories(interop_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}    
     ${MOXYGEN_DIR}
     ${MOXYGEN_INSTALL_DIR}/include
@@ -187,20 +187,20 @@ target_include_directories(interop_test_runner PRIVATE
 # Add zstd include directory dynamically
 foreach(ZSTD_CANDIDATE_DIR ${ZSTD_DIRS})
     if(EXISTS ${ZSTD_CANDIDATE_DIR}/include)
-        target_include_directories(interop_test_runner PRIVATE ${ZSTD_CANDIDATE_DIR}/include)
+        target_include_directories(interop_tests PRIVATE ${ZSTD_CANDIDATE_DIR}/include)
         break()
     endif()
 endforeach()
 
 # Find additional include directories
-target_include_directories(interop_test_runner PRIVATE
+target_include_directories(interop_tests PRIVATE
     ${GLOG_DIR}/include
     ${GFLAGS_DIR}/include
     ${FMT_DIR}/include
 )
 
 # Link against all required libraries - order matters for static libraries
-target_link_libraries(interop_test_runner
+target_link_libraries(interop_tests
     # Start with moxygen libraries in dependency order
     ${MOXYGEN_LIB}
     ${MOQRELAY_LIB}
@@ -235,6 +235,6 @@ target_link_libraries(interop_test_runner
     c++abi
 )
 
-set_target_properties(interop_test_runner PROPERTIES
+set_target_properties(interop_tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )

@@ -1,4 +1,4 @@
-#include "TestSuite.h"
+#include "test_suite.h"
 #include <iostream>
 #include <folly/init/Init.h>
 #include <folly/io/async/EventBaseThread.h>

@@ -1,5 +1,5 @@
-#include "BaseTest.h"
-#include "TestFixture.h"
+#include "base_test.h"
+#include "test_fixture.h"
 #include <iostream>
 
 namespace interop_test {

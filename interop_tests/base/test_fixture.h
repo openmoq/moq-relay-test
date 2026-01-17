@@ -4,8 +4,8 @@
 #include <string>
 #include <chrono>
 #include <folly/io/async/EventBase.h>
-#include "../moq_interface.h"
-#include "../TestCommon.h"
+#include "moq_interface.h"
+#include "test_commons.h"
 
 namespace interop_test {
 

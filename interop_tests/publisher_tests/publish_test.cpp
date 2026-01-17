@@ -1,7 +1,7 @@
-#include "TestCommon.h"
-#include "TestRegistry.h"
-#include "base/BaseTest.h"
-#include "base/TestFixture.h"
+#include "test_commons.h"
+#include "test_registry.h"
+#include "base/base_test.h"
+#include "base/test_fixture.h"
 #include "moq_interface.h"
 #include <folly/coro/BlockingWait.h>
 #include <memory>

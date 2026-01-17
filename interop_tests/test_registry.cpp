@@ -1,4 +1,4 @@
-#include "TestRegistry.h"
+#include "test_registry.h"
 #include <stdexcept>
 
 namespace interop_test {

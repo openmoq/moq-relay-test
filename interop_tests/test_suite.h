@@ -1,7 +1,7 @@
 #pragma once
 
-#include "TestRegistry.h"
-#include "base/BaseTest.h"
+#include "test_registry.h"
+#include "base/base_test.h"
 #include <memory>
 #include <vector>
 #include <string>
