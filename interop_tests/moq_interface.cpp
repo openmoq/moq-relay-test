@@ -31,10 +31,11 @@ folly::coro::Task<bool> MoQInterface::connect(
             verifier = std::make_shared<fizz::InsecureAcceptAnyCertificate>();
         }
 
-        // Create MoQ client
+        // Create MoQ client with MoQRelaySession factory for announcement support
         client_ = std::make_shared<moxygen::MoQClient>(
             executor,
             std::move(parsedUrl),
+            moxygen::MoQRelaySession::createRelaySessionFactory(),
             verifier);
 
         // Set up MoQ session
@@ -46,11 +47,20 @@ folly::coro::Task<bool> MoQInterface::connect(
             {}
         );
         
+        // Cast once and store for later use
+        relaySession_ = std::dynamic_pointer_cast<moxygen::MoQRelaySession>(client_->moqSession_);
+        if (!relaySession_) {
+            std::cerr << "Failed to cast to MoQRelaySession" << std::endl;
+            client_.reset();
+            co_return false;
+        }
+        
         std::cout << "MoQ session established successfully" << std::endl;
         co_return true;
 
     } catch (const std::exception& ex) {
         std::cerr << "Failed to establish MoQ session: " << ex.what() << std::endl;
+        relaySession_.reset();
         client_.reset();
         co_return false;
     }
@@ -162,6 +172,42 @@ folly::coro::Task<bool> MoQInterface::subscribe(
         }
     } catch (const std::exception& ex) {
         std::cerr << "Exception in subscribe: " << ex.what() << std::endl;
+        co_return false;
+    }
+}
+
+folly::coro::Task<bool> MoQInterface::announce(const std::string& trackNamespace) {
+    try {
+        if (!isConnected() || !relaySession_) {
+            std::cerr << "No MoQ relay session available" << std::endl;
+            co_return false;
+        }
+
+        // Create announce request
+        moxygen::Announce announce;
+        announce.requestID = moxygen::RequestID{1};
+        announce.trackNamespace = moxygen::TrackNamespace(
+            std::vector<std::string>{trackNamespace}
+        );
+
+        std::cout << "Sending announce request for namespace: "
+                  << trackNamespace << std::endl;
+
+        // Send announce request
+        auto announceResult = co_await relaySession_->announce(announce);
+
+        if (announceResult.hasValue()) {
+            auto announceHandle = std::move(announceResult.value());
+            std::cout << "Announce OK received for namespace: "
+                      << trackNamespace << std::endl;
+            co_return true;
+        } else {
+            auto error = announceResult.error();
+            std::cerr << "Announce failed: " << error.reasonPhrase << std::endl;
+            co_return false;
+        }
+    } catch (const std::exception& ex) {
+        std::cerr << "Exception in announce: " << ex.what() << std::endl;
         co_return false;
     }
 }

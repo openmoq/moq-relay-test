@@ -150,6 +150,7 @@ set(MOXYGEN_SOURCES
     ${MOXYGEN_SRC_DIR}/MoQClient.cpp
     ${MOXYGEN_SRC_DIR}/MoQWebTransportClient.cpp
     ${MOXYGEN_SRC_DIR}/MoQClientBase.cpp
+    ${MOXYGEN_SRC_DIR}/MoQRelaySession.cpp
     ${MOXYGEN_SRC_DIR}/events/MoQFollyExecutorImpl.cpp
     ${MOXYGEN_SRC_DIR}/util/QuicConnector.cpp
 )
@@ -159,6 +160,7 @@ add_executable(interop_tests
     test_suite.cpp
     test_registry.cpp
     publisher_tests/publish_test.cpp
+    publisher_tests/publish_namespace_test.cpp
     subscriber_tests/subscribe_test.cpp
     subscriber_tests/subscribe_error_test.cpp
     moq_interface.cpp

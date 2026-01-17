@@ -7,6 +7,7 @@
 #include <folly/io/async/EventBase.h>
 #include <moxygen/MoQClient.h>
 #include <moxygen/MoQSession.h>
+#include <moxygen/MoQRelaySession.h>
 #include <moxygen/Publisher.h>
 #include <moxygen/Subscriber.h>
 #include <moxygen/events/MoQFollyExecutorImpl.h>
@@ -66,6 +67,13 @@ public:
         uint8_t priority = 128,
         moxygen::GroupOrder groupOrder = moxygen::GroupOrder::OldestFirst);
 
+    /**
+     * Announces a namespace to the MoQ relay
+     * @param trackNamespace The namespace to announce (e.g., "video/conference")
+     * @return Task that resolves to true on success
+     */
+    folly::coro::Task<bool> announce(const std::string& trackNamespace);
+
     std::shared_ptr<moxygen::MoQClient> getClient() const { return client_; }
     
     bool isConnected() const { return client_ && client_->moqSession_; }
@@ -73,6 +81,7 @@ public:
 private:
     folly::EventBase* eventBase_;
     std::shared_ptr<moxygen::MoQClient> client_;
+    std::shared_ptr<moxygen::MoQRelaySession> relaySession_;  // Cache the casted session
 };
 
 } // namespace moq_interface
