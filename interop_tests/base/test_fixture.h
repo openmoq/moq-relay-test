@@ -4,7 +4,7 @@
 #include <string>
 #include <chrono>
 #include <folly/io/async/EventBase.h>
-#include "moq_interface.h"
+#include "moxygen_interface.h"
 #include "test_commons.h"
 
 namespace interop_test {
@@ -44,24 +44,24 @@ public:
     /**
      * Get or create a publisher connection
      * The connection is established on first call and reused
-     * @return Shared pointer to MoQInterface configured as publisher
+     * @return Shared pointer to MoxygenInterface configured as publisher
      */
-    std::shared_ptr<moq_interface::MoQInterface> getPublisher();
+    std::shared_ptr<moxygen_interface::MoxygenInterface> getPublisher();
 
     /**
      * Get or create a subscriber connection
      * The connection is established on first call and reused
-     * @return Shared pointer to MoQInterface configured as subscriber
+     * @return Shared pointer to MoxygenInterface configured as subscriber
      */
-    std::shared_ptr<moq_interface::MoQInterface> getSubscriber();
+    std::shared_ptr<moxygen_interface::MoxygenInterface> getSubscriber();
 
     /**
      * Create a fresh MoQ interface (not cached)
      * Useful for tests that need multiple connections
      * @param autoConnect If true, automatically connects to relay
-     * @return New MoQInterface instance
+     * @return New MoxygenInterface instance
      */
-    std::shared_ptr<moq_interface::MoQInterface> createMoQInterface(bool autoConnect = false);
+    std::shared_ptr<moxygen_interface::MoxygenInterface> createMoQInterface(bool autoConnect = false);
 
     /**
      * Create a test subscription handle
@@ -103,12 +103,12 @@ private:
     std::chrono::milliseconds timeout_;
 
     // Managed resources
-    std::shared_ptr<moq_interface::MoQInterface> publisher_;
-    std::shared_ptr<moq_interface::MoQInterface> subscriber_;
-    std::vector<std::shared_ptr<moq_interface::MoQInterface>> additionalInterfaces_;
+    std::shared_ptr<moxygen_interface::MoxygenInterface> publisher_;
+    std::shared_ptr<moxygen_interface::MoxygenInterface> subscriber_;
+    std::vector<std::shared_ptr<moxygen_interface::MoxygenInterface>> additionalInterfaces_;
 
     // Helper methods
-    void cleanupInterface(std::shared_ptr<moq_interface::MoQInterface>& interface, 
+    void cleanupInterface(std::shared_ptr<moxygen_interface::MoxygenInterface>& interface, 
                          const std::string& name);
 };
 

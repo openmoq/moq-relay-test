@@ -1,0 +1,94 @@
+#pragma once
+
+#include <chrono>
+#include <fizz/tool/CertificateVerifiers.h>
+#include <folly/coro/Task.h>
+#include <folly/io/async/EventBase.h>
+#include <memory>
+#include <moxygen/MoQClient.h>
+#include <moxygen/MoQRelaySession.h>
+#include <moxygen/MoQSession.h>
+#include <moxygen/Publisher.h>
+#include <moxygen/Subscriber.h>
+#include <moxygen/events/MoQFollyExecutorImpl.h>
+#include <proxygen/lib/utils/URL.h>
+#include <string>
+
+namespace moxygen_interface {
+
+/**
+ * MoQ Interface - Provides a simplified interface for MoQ operations
+ */
+class MoxygenInterface {
+public:
+  explicit MoxygenInterface(folly::EventBase *eventBase);
+  ~MoxygenInterface() = default;
+
+  /**
+   * Establishes a MoQ session with the given URL
+   * @param url The MoQ relay server URL
+   * @param connectTimeout Connection timeout
+   * @param transactionTimeout Transaction timeout
+   * @param useInsecureVerifier Whether to use insecure certificate verification
+   * @return Task that resolves to true on success
+   */
+  folly::coro::Task<bool> connect(const std::string &url,
+                                  std::chrono::milliseconds connectTimeout =
+                                      std::chrono::milliseconds(30000),
+                                  std::chrono::milliseconds transactionTimeout =
+                                      std::chrono::milliseconds(30000),
+                                  bool useInsecureVerifier = true);
+
+  /**
+   * Sends a publish request to the MoQ relay
+   * @param trackNamespace The track namespace
+   * @param trackName The track name
+   * @param subscriptionHandle Optional subscription handle
+   * @return Task that resolves to true on success
+   */
+  folly::coro::Task<bool>
+  publish(const std::string &trackNamespace, const std::string &trackName,
+          std::shared_ptr<moxygen::SubscriptionHandle> subscriptionHandle =
+              nullptr);
+
+  /**
+   * Subscribes to a track on the MoQ relay
+   * @param trackNamespace The track namespace
+   * @param trackName The track name
+   * @param trackConsumer Callback to receive track data
+   * @param priority Subscribe priority (default: 128)
+   * @param groupOrder Group ordering preference (default: OldestFirst)
+   * @return Task that resolves to true on success
+   */
+  folly::coro::Task<bool>
+  subscribe(const std::string &trackNamespace, const std::string &trackName,
+            std::shared_ptr<moxygen::TrackConsumer> trackConsumer,
+            uint8_t priority = 128,
+            moxygen::GroupOrder groupOrder = moxygen::GroupOrder::OldestFirst);
+
+  /**
+   * Announces a namespace to the MoQ relay
+   * @param trackNamespace The namespace to announce (e.g., "video/conference")
+   * @return Task that resolves to true on success
+   */
+  folly::coro::Task<bool> announce(const std::string &trackNamespace);
+
+  /**
+   * Signals publish done for a namespace to the MoQ relay
+   * @param trackNamespace The namespace to unannounce (e.g., "video/conference")
+   * @return Task that resolves to true on success
+   */
+  folly::coro::Task<bool> unannounce(const std::string &trackNamespace);
+
+  std::shared_ptr<moxygen::MoQClient> getClient() const { return client_; }
+
+  bool isConnected() const { return client_ && client_->moqSession_; }
+
+private:
+  folly::EventBase *eventBase_;
+  std::shared_ptr<moxygen::MoQClient> client_;
+  std::shared_ptr<moxygen::MoQRelaySession>
+      relaySession_; // Cache the casted session
+};
+
+} // namespace moxygen_interface

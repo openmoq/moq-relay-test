@@ -161,9 +161,10 @@ add_executable(interop_tests
     test_registry.cpp
     publisher_tests/publish_test.cpp
     publisher_tests/publish_namespace_test.cpp
+    publisher_tests/publish_namespace_done_test.cpp
     subscriber_tests/subscribe_test.cpp
     subscriber_tests/subscribe_error_test.cpp
-    moq_interface.cpp
+    moxygen_interface.cpp
     base/base_test.cpp
     base/test_fixture.cpp
     ${MOXYGEN_SOURCES}

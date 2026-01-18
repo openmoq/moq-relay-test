@@ -2,7 +2,7 @@
 #include "test_commons.h"
 #include "test_registry.h"
 #include "base/test_fixture.h"
-#include "moq_interface.h"
+#include "moxygen_interface.h"
 #include <folly/coro/BlockingWait.h>
 
 namespace interop_test {

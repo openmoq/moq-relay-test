@@ -6,7 +6,6 @@
 #include <vector>
 #include <folly/io/async/EventBase.h>
 #include "test_commons.h"
-#include "moq_interface.h"
 
 namespace interop_test {
 

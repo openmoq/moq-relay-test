@@ -2,7 +2,7 @@
 #include "test_registry.h"
 #include "base/base_test.h"
 #include "base/test_fixture.h"
-#include "moq_interface.h"
+#include "moxygen_interface.h"
 #include <folly/coro/BlockingWait.h>
 #include <memory>
 #include <moxygen/MoQConsumers.h>
