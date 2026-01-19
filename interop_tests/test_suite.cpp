@@ -25,6 +25,22 @@ bool TestSuite::runAll(const TestSuiteConfig& config) {
         return false;
     }
 
+    // Filter tests by name if specific tests are requested
+    if (!config.testNames.empty()) {
+        std::vector<TestInfo> filteredTests;
+        for (const auto& testInfo : tests) {
+            if (std::find(config.testNames.begin(), config.testNames.end(), testInfo.name) != config.testNames.end()) {
+                filteredTests.push_back(testInfo);
+            }
+        }
+        tests = filteredTests;
+        
+        if (tests.empty()) {
+            std::cout << "No matching tests found!\n";
+            return false;
+        }
+    }
+
     std::cout << "Found " << tests.size() << " test(s) to run\n\n";
 
     // Run all registered tests

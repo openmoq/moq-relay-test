@@ -12,6 +12,7 @@ namespace interop_test {
 struct TestSuiteConfig {
     std::string relayUrl{"https://localhost:4433/moq"};
     TestCategory category{TestCategory::ALL}; // Run tests from specific category
+    std::vector<std::string> testNames; // Specific test names to run (empty = run all)
 };
 
 class TestSuite {

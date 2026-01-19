@@ -117,8 +117,10 @@ folly::coro::Task<bool> MoxygenInterface::publish(
 }
 
 folly::coro::Task<bool> MoxygenInterface::subscribe(
-    const std::string &trackNamespace, const std::string &trackName,
-    std::shared_ptr<moxygen::TrackConsumer> trackConsumer, uint8_t priority,
+    const std::string &trackNamespace, 
+    const std::string &trackName,
+    std::shared_ptr<moxygen::TrackConsumer> trackConsumer, 
+    uint8_t priority,
     moxygen::GroupOrder groupOrder) {
 
   try {
@@ -229,9 +231,74 @@ MoxygenInterface::unannounce(const std::string &trackNamespace) {
     // Send unannounce request
     announceHandle_->unannounce();
     co_return true;
-    
+
   } catch (const std::exception &ex) {
     std::cerr << "Exception in unannounce: " << ex.what() << std::endl;
+    co_return false;
+  }
+}
+
+folly::coro::Task<bool>
+MoxygenInterface::subscribeAnnounces(const std::string &trackNamespace) {
+  try {
+    if (!isConnected() || !relaySession_) {
+      std::cerr << "No MoQ relay session available" << std::endl;
+      co_return false;
+    }
+
+    // Create subscribe announces request
+    moxygen::SubscribeAnnounces subscribeAnnounces;
+    subscribeAnnounces.requestID = moxygen::RequestID{1};
+    subscribeAnnounces.trackNamespacePrefix =
+        moxygen::TrackNamespace(std::vector<std::string>{trackNamespace});
+
+    auto subscribeAnnounceResult_ =
+        co_await relaySession_->subscribeAnnounces(subscribeAnnounces);
+
+    if (!subscribeAnnounceResult_.hasValue()) {
+      auto error = subscribeAnnounceResult_.error();
+      std::cerr << "Subscribe announces failed: " << error.reasonPhrase
+                << std::endl;
+      co_return false;
+    } else {
+      std::cout << "Subscribe announces succeeded for namespace: "
+                << trackNamespace << std::endl;
+      co_return true;
+    }
+
+  } catch (const std::exception &ex) {
+    std::cerr << "Exception in subscribe announces: " << ex.what() << std::endl;
+    co_return false;
+  }
+}
+
+folly::coro::Task<bool> MoxygenInterface::trackStatus(
+    const std::string &trackNamespace, const std::string &trackName) {
+  try {
+    if (!isConnected() || !relaySession_) {
+      std::cerr << "No MoQ relay session available" << std::endl;
+      co_return false;
+    }
+
+    auto result = co_await relaySession_->trackStatus(moxygen::TrackStatus{
+        .requestID = moxygen::RequestID{1},
+        .fullTrackName = moxygen::FullTrackName{
+            .trackNamespace = moxygen::TrackNamespace(
+                std::vector<std::string>{trackNamespace}),
+            .trackName = trackName}});
+
+    if (result.hasValue()) {
+      auto trackStatusOk = result.value();
+      std::cout << "Track Status OK received for track: " << trackNamespace
+                << "/" << trackName << std::endl;
+      co_return true;
+    } else {
+      auto error = result.error();
+      std::cerr << "Track Status failed: " << error.reasonPhrase << std::endl;
+      co_return false;
+    }
+  } catch (const std::exception &ex) {
+    std::cerr << "Exception in trackStatus: " << ex.what() << std::endl;
     co_return false;
   }
 }

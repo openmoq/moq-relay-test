@@ -164,6 +164,9 @@ add_executable(interop_tests
     publisher_tests/publish_namespace_done_test.cpp
     subscriber_tests/subscribe_test.cpp
     subscriber_tests/subscribe_error_test.cpp
+    subscriber_tests/subscribe_namespace_test.cpp
+    subscriber_tests/subscribe_namespace_error_test.cpp
+    subscriber_tests/track_status_test.cpp
     moxygen_interface.cpp
     base/base_test.cpp
     base/test_fixture.cpp

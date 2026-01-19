@@ -80,6 +80,23 @@ public:
    */
   folly::coro::Task<bool> unannounce(const std::string &trackNamespace);
 
+  /**
+   * Subscribes to announces for a given namespace prefix
+   * @param trackNamespace The namespace prefix to subscribe to (e.g., "video/")
+   * @return Task that resolves to true on success
+   */
+  folly::coro::Task<bool> subscribeAnnounces(
+      const std::string &trackNamespace);
+
+  /**
+   * Sends a track status request to the MoQ relay
+   * @param trackNamespace The track namespace
+   * @param trackName The track name
+   * @return Task that resolves to true on success
+   */
+  folly::coro::Task<bool> trackStatus(const std::string &trackNamespace,
+                                       const std::string &trackName);
+
   std::shared_ptr<moxygen::MoQClient> getClient() const { return client_; }
 
   bool isConnected() const { return client_ && client_->moqSession_; }
