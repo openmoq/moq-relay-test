@@ -6,13 +6,13 @@
 #include <chrono>
 #include <memory>
 #include <thread>
-#include "moxygen_interface.h"
+#include "moxygen_adapter/moxygen_interface.h"
 
 std::unique_ptr<folly::EventBaseThread> globalEventBaseThread;
 // TODO: DELETE THIS
 // Just testing things out
 folly::coro::Task<void> testConnection() {
-    std::shared_ptr<moxygen_interface::MoxygenInterface> moqInterface = nullptr;
+    std::shared_ptr<interop_test::MoxygenInterface> moqInterface = nullptr;
     try {
         std::cout << "Creating event base..." << std::endl;
 
@@ -20,7 +20,7 @@ folly::coro::Task<void> testConnection() {
 
         std::cout << "Setting up MoQ session..." << std::endl;
 
-        moqInterface = std::make_shared<moxygen_interface::MoxygenInterface>(
+        moqInterface = std::make_shared<interop_test::MoxygenInterface>(
             globalEventBaseThread->getEventBase());
         
         bool connected = co_await moqInterface->connect("https://localhost:4433/moq");

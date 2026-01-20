@@ -4,8 +4,8 @@
 #include <string>
 #include <chrono>
 #include <folly/io/async/EventBase.h>
-#include "moxygen_interface.h"
-#include "test_commons.h"
+#include "moxygen_adapter/moxygen_interface.h"
+#include "moxygen_adapter/moxygen_mocks.h"
 
 namespace interop_test {
 
@@ -46,14 +46,14 @@ public:
      * The connection is established on first call and reused
      * @return Shared pointer to MoxygenInterface configured as publisher
      */
-    std::shared_ptr<moxygen_interface::MoxygenInterface> getPublisher();
+    std::shared_ptr<MoxygenInterface> getPublisher();
 
     /**
      * Get or create a subscriber connection
      * The connection is established on first call and reused
      * @return Shared pointer to MoxygenInterface configured as subscriber
      */
-    std::shared_ptr<moxygen_interface::MoxygenInterface> getSubscriber();
+    std::shared_ptr<MoxygenInterface> getSubscriber();
 
     /**
      * Create a fresh MoQ interface (not cached)
@@ -61,7 +61,7 @@ public:
      * @param autoConnect If true, automatically connects to relay
      * @return New MoxygenInterface instance
      */
-    std::shared_ptr<moxygen_interface::MoxygenInterface> createMoQInterface(bool autoConnect = false);
+    std::shared_ptr<MoxygenInterface> createMoQInterface(bool autoConnect = false);
 
     /**
      * Create a test subscription handle
@@ -103,12 +103,12 @@ private:
     std::chrono::milliseconds timeout_;
 
     // Managed resources
-    std::shared_ptr<moxygen_interface::MoxygenInterface> publisher_;
-    std::shared_ptr<moxygen_interface::MoxygenInterface> subscriber_;
-    std::vector<std::shared_ptr<moxygen_interface::MoxygenInterface>> additionalInterfaces_;
+    std::shared_ptr<MoxygenInterface> publisher_;
+    std::shared_ptr<MoxygenInterface> subscriber_;
+    std::vector<std::shared_ptr<MoxygenInterface>> additionalInterfaces_;
 
     // Helper methods
-    void cleanupInterface(std::shared_ptr<moxygen_interface::MoxygenInterface>& interface, 
+    void cleanupInterface(std::shared_ptr<MoxygenInterface>& interface, 
                          const std::string& name);
 };
 

@@ -1,8 +1,8 @@
-#include "test_commons.h"
+#include "moxygen_adapter/moxygen_mocks.h"
 #include "test_registry.h"
 #include "base/base_test.h"
-#include "base/test_fixture.h"
-#include "moxygen_interface.h"
+#include "moxygen_adapter/moxygen_fixture.h"
+#include "moxygen_adapter/moxygen_interface.h"
 #include <folly/coro/BlockingWait.h>
 #include <memory>
 #include <moxygen/MoQConsumers.h>
@@ -52,9 +52,8 @@ TestResult SubscribeTest::execute() {
   assertNotNull(publisher.get(), "Publisher interface should not be null");
   assertTrue(publisher->isConnected(), "Publisher should be connected");
 
-  auto subscriptionHandle = fixture_->createSubscriptionHandle();
   bool publishResult = folly::coro::blockingWait(
-      publisher->publish(trackNamespace_, trackName_, subscriptionHandle));
+      publisher->publish(trackNamespace_, trackName_));
   assertTrue(publishResult, "Publish request should succeed");
   log("Publish successful");
 

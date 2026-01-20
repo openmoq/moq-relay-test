@@ -167,9 +167,10 @@ add_executable(interop_tests
     subscriber_tests/subscribe_namespace_test.cpp
     subscriber_tests/subscribe_namespace_error_test.cpp
     subscriber_tests/track_status_test.cpp
-    moxygen_interface.cpp
+    moxygen_adapter/moxygen_interface.cpp
+    moxygen_adapter/moxygen_mocks.cpp
+    moxygen_adapter/moxygen_fixture.cpp
     base/base_test.cpp
-    base/test_fixture.cpp
     ${MOXYGEN_SOURCES}
 )
 

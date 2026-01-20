@@ -1,5 +1,5 @@
-#include "test_fixture.h"
-#include "base_test.h"
+#include "moxygen_fixture.h"
+#include "base/base_test.h"
 #include <iostream>
 #include <thread>
 #include <folly/coro/BlockingWait.h>
@@ -40,10 +40,10 @@ void TestFixture::tearDown() {
     std::cout << "  [Fixture] Cleanup completed" << std::endl;
 }
 
-std::shared_ptr<moxygen_interface::MoxygenInterface> TestFixture::getPublisher() {
+std::shared_ptr<MoxygenInterface> TestFixture::getPublisher() {
     if (!publisher_) {
         std::cout << "  [Fixture] Creating publisher connection..." << std::endl;
-        publisher_ = std::make_shared<moxygen_interface::MoxygenInterface>(eventBase_);
+        publisher_ = std::make_shared<MoxygenInterface>(eventBase_);
 
         try {
             bool connected = folly::coro::blockingWait(publisher_->connect(relayUrl_));
@@ -63,10 +63,10 @@ std::shared_ptr<moxygen_interface::MoxygenInterface> TestFixture::getPublisher()
     return publisher_;
 }
 
-std::shared_ptr<moxygen_interface::MoxygenInterface> TestFixture::getSubscriber() {
+std::shared_ptr<MoxygenInterface> TestFixture::getSubscriber() {
     if (!subscriber_) {
         std::cout << "  [Fixture] Creating subscriber connection..." << std::endl;
-        subscriber_ = std::make_shared<moxygen_interface::MoxygenInterface>(eventBase_);
+        subscriber_ = std::make_shared<MoxygenInterface>(eventBase_);
 
         try {
             bool connected = folly::coro::blockingWait(subscriber_->connect(relayUrl_));
@@ -86,10 +86,10 @@ std::shared_ptr<moxygen_interface::MoxygenInterface> TestFixture::getSubscriber(
     return subscriber_;
 }
 
-std::shared_ptr<moxygen_interface::MoxygenInterface> TestFixture::createMoQInterface(bool autoConnect) {
+std::shared_ptr<MoxygenInterface> TestFixture::createMoQInterface(bool autoConnect) {
     std::cout << "\n[INTERFACE] Creating new MoQ interface..." << std::endl;
     
-    auto interface = std::make_shared<moxygen_interface::MoxygenInterface>(eventBase_);
+    auto interface = std::make_shared<MoxygenInterface>(eventBase_);
     
     if (autoConnect) {
         try {
@@ -111,9 +111,9 @@ std::shared_ptr<moxygen_interface::MoxygenInterface> TestFixture::createMoQInter
     return interface;
 }
 
-std::shared_ptr<TestSubscriptionHandle> TestFixture::createSubscriptionHandle() {
-    return std::make_shared<TestSubscriptionHandle>();
-}
+// std::shared_ptr<TestSubscriptionHandle> TestFixture::createSubscriptionHandle() {
+//     return std::make_shared<TestSubscriptionHandle>();
+// }
 
 void TestFixture::resetPublisher() {
     if (publisher_) {
@@ -129,7 +129,7 @@ void TestFixture::resetSubscriber() {
     }
 }
 
-void TestFixture::cleanupInterface(std::shared_ptr<moxygen_interface::MoxygenInterface>& interface,
+void TestFixture::cleanupInterface(std::shared_ptr<MoxygenInterface>& interface,
                                    const std::string& name) {
     if (!interface) {
         return;

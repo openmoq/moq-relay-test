@@ -5,12 +5,13 @@
 #include <string>
 #include <vector>
 #include <folly/io/async/EventBase.h>
-#include "test_commons.h"
 
 namespace interop_test {
 
 // Forward declaration
 class TestFixture;
+
+enum class TestResult { PASS, FAIL, TIMEOUT, ERROR };
 
 /**
  * Test categories for organizing and filtering tests

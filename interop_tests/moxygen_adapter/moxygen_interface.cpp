@@ -1,7 +1,8 @@
 #include "moxygen_interface.h"
+#include "moxygen_mocks.h"
 #include <iostream>
 
-namespace moxygen_interface {
+namespace interop_test {
 
 MoxygenInterface::MoxygenInterface(folly::EventBase *eventBase)
     : eventBase_(eventBase) {
@@ -59,8 +60,7 @@ folly::coro::Task<bool> MoxygenInterface::connect(
 }
 
 folly::coro::Task<bool> MoxygenInterface::publish(
-    const std::string &trackNamespace, const std::string &trackName,
-    std::shared_ptr<moxygen::SubscriptionHandle> subscriptionHandle) {
+    const std::string &trackNamespace, const std::string &trackName) {
 
   try {
     if (!isConnected()) {
@@ -83,6 +83,8 @@ folly::coro::Task<bool> MoxygenInterface::publish(
 
     std::cout << "Sending publish request for track: " << trackNamespace << "/"
               << trackName << std::endl;
+
+    auto subscriptionHandle = std::make_shared<TestSubscriptionHandle>();
 
     // Send publish request via session's publish method
     auto publishResult = session->publish(publishReq, subscriptionHandle);
@@ -302,5 +304,54 @@ folly::coro::Task<bool> MoxygenInterface::trackStatus(
     co_return false;
   }
 }
+
+// folly::coro::Task<bool> MoxygenInterface::goaway() {
+//   try {
+//     if (!isConnected() || !relaySession_) {
+//       std::cerr << "No MoQ relay session available" << std::endl;
+//       co_return false;
+//     }
+
+//     co_await relaySession_->goaway();
+//     std::cout << "Goaway sent successfully" << std::endl;
+//     co_return true;
+//     } catch (const std::exception &ex) {
+//       std::cerr << "Exception in goaway: " << ex.what() << std::endl;
+//     co_return false;
+//   }
+// }
+
+// folly::coro::Task<bool> MoxygenInterface::goaway_sequence() {
+//   try {
+//     if (!isConnected() || !relaySession_) {
+//       std::cerr << "No MoQ relay session available" << std::endl;
+//       co_return false;
+//     }
+
+//     // First, publish with a dummy track name
+//     std::cout << "Publishing dummy track before goaway" << std::endl;
+//     bool publishSuccess = co_await publish("dummy_namespace", "dummy_track", nullptr);
+//     if (!publishSuccess) {
+//       std::cerr << "Failed to publish dummy track" << std::endl;
+//       co_return false;
+//     }
+
+//     // Then, send goaway
+//     std::cout << "Sending goaway after publish" << std::endl;
+//     bool goawaySuccess = co_await goaway();
+//     if (!goawaySuccess) {
+//       std::cerr << "Failed to send goaway" << std::endl;
+//       co_return false;
+//     }
+
+//     std::cout << "Goaway sequence completed successfully" << std::endl;
+//     co_return true;
+//   } catch (const std::exception &ex) {
+//     std::cerr << "Exception in goaway_sequence: " << ex.what() << std::endl;
+//     co_return false;
+//   }
+// }
+
+    
 
 } // namespace moxygen_interface

@@ -14,7 +14,7 @@
 #include <proxygen/lib/utils/URL.h>
 #include <string>
 
-namespace moxygen_interface {
+namespace interop_test {
 
 /**
  * MoQ Interface - Provides a simplified interface for MoQ operations
@@ -47,9 +47,7 @@ public:
    * @return Task that resolves to true on success
    */
   folly::coro::Task<bool>
-  publish(const std::string &trackNamespace, const std::string &trackName,
-          std::shared_ptr<moxygen::SubscriptionHandle> subscriptionHandle =
-              nullptr);
+  publish(const std::string &trackNamespace, const std::string &trackName);
 
   /**
    * Subscribes to a track on the MoQ relay
@@ -97,6 +95,18 @@ public:
   folly::coro::Task<bool> trackStatus(const std::string &trackNamespace,
                                        const std::string &trackName);
 
+    // /**
+    //  * Sends a goaway signal to the MoQ relay
+    //  * @return Task that resolves to true on success
+    //  */
+    // folly::coro::Task<bool> goaway();
+
+    // /**
+    //  * Sends a goaway signal after publishing a dummy track
+    //  * @return Task that resolves to true on success
+    //  */
+    // folly::coro::Task<bool> goaway_sequence();
+
   std::shared_ptr<moxygen::MoQClient> getClient() const { return client_; }
 
   bool isConnected() const { return client_ && client_->moqSession_; }
@@ -108,4 +118,4 @@ private:
       relaySession_; // Cache the casted session
 };
 
-} // namespace moxygen_interface
+} // namespace interop_test
