@@ -16,6 +16,9 @@
 
 namespace interop_test {
 
+// Forward declaration
+class TestSubscriptionHandle;
+
 /**
  * MoQ Interface - Provides a simplified interface for MoQ operations
  */
@@ -46,8 +49,9 @@ public:
    * @param subscriptionHandle Optional subscription handle
    * @return Task that resolves to true on success
    */
-  folly::coro::Task<bool>
-  publish(const std::string &trackNamespace, const std::string &trackName);
+  folly::coro::Task<bool> publish(const std::string &trackNamespace, 
+                                    const std::string &trackName,
+                                    std::shared_ptr<TestSubscriptionHandle> externalHandle = nullptr);
 
   /**
    * Subscribes to a track on the MoQ relay
@@ -95,17 +99,19 @@ public:
   folly::coro::Task<bool> trackStatus(const std::string &trackNamespace,
                                        const std::string &trackName);
 
-    // /**
-    //  * Sends a goaway signal to the MoQ relay
-    //  * @return Task that resolves to true on success
-    //  */
-    // folly::coro::Task<bool> goaway();
+    /**
+     * Sends a goaway signal to the MoQ relay
+     * @return Task that resolves to true on success
+     */
+    folly::coro::Task<bool> goaway();
 
-    // /**
-    //  * Sends a goaway signal after publishing a dummy track
-    //  * @return Task that resolves to true on success
-    //  */
-    // folly::coro::Task<bool> goaway_sequence();
+    /**
+     * Sends a goaway signal after publishing a dummy track
+     * @return Task that resolves to true on success
+     */
+    folly::coro::Task<bool> goaway_sequence();
+
+    folly::coro::Task<bool> setMaxConcurrentRequests(uint32_t maxConcurrentRequests);
 
   std::shared_ptr<moxygen::MoQClient> getClient() const { return client_; }
 

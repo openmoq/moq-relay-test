@@ -162,6 +162,8 @@ add_executable(interop_tests
     publisher_tests/publish_test.cpp
     publisher_tests/publish_namespace_test.cpp
     publisher_tests/publish_namespace_done_test.cpp
+    publisher_tests/goaway_test.cpp
+    publisher_tests/max_request_id_test.cpp
     subscriber_tests/subscribe_test.cpp
     subscriber_tests/subscribe_error_test.cpp
     subscriber_tests/subscribe_namespace_test.cpp

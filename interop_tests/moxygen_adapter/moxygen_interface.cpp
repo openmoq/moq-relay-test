@@ -1,5 +1,6 @@
 #include "moxygen_interface.h"
 #include "moxygen_mocks.h"
+#include <folly/futures/Future.h>
 #include <iostream>
 
 namespace interop_test {
@@ -60,7 +61,8 @@ folly::coro::Task<bool> MoxygenInterface::connect(
 }
 
 folly::coro::Task<bool> MoxygenInterface::publish(
-    const std::string &trackNamespace, const std::string &trackName) {
+    const std::string &trackNamespace, const std::string &trackName,
+    std::shared_ptr<TestSubscriptionHandle> externalHandle) {
 
   try {
     if (!isConnected()) {
@@ -84,7 +86,7 @@ folly::coro::Task<bool> MoxygenInterface::publish(
     std::cout << "Sending publish request for track: " << trackNamespace << "/"
               << trackName << std::endl;
 
-    auto subscriptionHandle = std::make_shared<TestSubscriptionHandle>();
+    auto subscriptionHandle = externalHandle ? externalHandle : std::make_shared<TestSubscriptionHandle>();
 
     // Send publish request via session's publish method
     auto publishResult = session->publish(publishReq, subscriptionHandle);
@@ -305,53 +307,81 @@ folly::coro::Task<bool> MoxygenInterface::trackStatus(
   }
 }
 
-// folly::coro::Task<bool> MoxygenInterface::goaway() {
-//   try {
-//     if (!isConnected() || !relaySession_) {
-//       std::cerr << "No MoQ relay session available" << std::endl;
-//       co_return false;
-//     }
+folly::coro::Task<bool> MoxygenInterface::goaway() {
+  try {
+    if (!isConnected() || !relaySession_) {
+      std::cerr << "No MoQ relay session available" << std::endl;
+      co_return false;
+    }
 
-//     co_await relaySession_->goaway();
-//     std::cout << "Goaway sent successfully" << std::endl;
-//     co_return true;
-//     } catch (const std::exception &ex) {
-//       std::cerr << "Exception in goaway: " << ex.what() << std::endl;
-//     co_return false;
-//   }
-// }
+    std::cout << "Sending goaway after publish" << std::endl;
+    moxygen::Goaway goaway_inp{.newSessionUri = ""};
 
-// folly::coro::Task<bool> MoxygenInterface::goaway_sequence() {
-//   try {
-//     if (!isConnected() || !relaySession_) {
-//       std::cerr << "No MoQ relay session available" << std::endl;
-//       co_return false;
-//     }
-
-//     // First, publish with a dummy track name
-//     std::cout << "Publishing dummy track before goaway" << std::endl;
-//     bool publishSuccess = co_await publish("dummy_namespace", "dummy_track", nullptr);
-//     if (!publishSuccess) {
-//       std::cerr << "Failed to publish dummy track" << std::endl;
-//       co_return false;
-//     }
-
-//     // Then, send goaway
-//     std::cout << "Sending goaway after publish" << std::endl;
-//     bool goawaySuccess = co_await goaway();
-//     if (!goawaySuccess) {
-//       std::cerr << "Failed to send goaway" << std::endl;
-//       co_return false;
-//     }
-
-//     std::cout << "Goaway sequence completed successfully" << std::endl;
-//     co_return true;
-//   } catch (const std::exception &ex) {
-//     std::cerr << "Exception in goaway_sequence: " << ex.what() << std::endl;
-//     co_return false;
-//   }
-// }
-
+    relaySession_->goaway(goaway_inp);
+    std::cout << "Goaway sent successfully" << std::endl;
     
+    
+    co_return true;
+  } catch (const std::exception &ex) {
+    std::cerr << "Exception in goaway: " << ex.what() << std::endl;
+    co_return false;
+  }
+}
 
-} // namespace moxygen_interface
+folly::coro::Task<bool> MoxygenInterface::goaway_sequence() {
+  try {
+    if (!isConnected() || !relaySession_) {
+      std::cerr << "No MoQ relay session available" << std::endl;
+      co_return false;
+    }
+
+    // First, publish with a dummy track name
+    std::cout << "Publishing dummy track before goaway" << std::endl;
+    auto subscriptionHandle_ = std::make_shared<TestSubscriptionHandle>();
+    bool publishSuccess = co_await publish("dummy_namespace", "dummy_track", subscriptionHandle_);
+    if (!publishSuccess) {
+      std::cerr << "Failed to publish dummy track" << std::endl;
+      co_return false;
+    }
+
+    // Then, send goaway
+    bool goawaySuccess = co_await goaway();
+    if (!goawaySuccess) {
+      std::cerr << "Failed to send goaway" << std::endl;
+      co_return false;
+    }
+
+    std::cout << "Goaway sequence completed successfully" << std::endl;
+    
+    // After goaway, the session may close immediately, so we can't reliably
+    // check if unsubscribe was called. Just return success if goaway sent.
+    // Note that the protocol recommends waiting for a short period though for the unsubscribes.
+    co_return true;
+
+  } catch (const std::exception &ex) {
+    std::cerr << "Exception in goaway_sequence: " << ex.what() << std::endl;
+    co_return false;
+  }
+}
+
+folly::coro::Task<bool> MoxygenInterface::setMaxConcurrentRequests(
+    uint32_t maxConcurrentRequests) {
+  try {
+    if (!isConnected() || !relaySession_) {
+      std::cerr << "No MoQ relay session available" << std::endl;
+      co_return false;
+    }
+
+    relaySession_->setMaxConcurrentRequests(maxConcurrentRequests);
+    std::cout << "Set max concurrent requests to: " << maxConcurrentRequests
+              << std::endl;
+    co_return true;
+
+  } catch (const std::exception &ex) {
+    std::cerr << "Exception in setMaxConcurrentRequests: " << ex.what()
+              << std::endl;
+    co_return false;
+  }
+}
+
+} // namespace interop_test

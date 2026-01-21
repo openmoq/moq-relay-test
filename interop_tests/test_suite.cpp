@@ -90,21 +90,21 @@ void TestSuite::recordResult(const std::string& testName, TestResult result, con
     switch (result) {
         case TestResult::PASS:
             passedTests_++;
-            std::cout << "✓ " << testName << " PASSED\n\n";
+            std::cout << testName << " PASSED\n\n";
             break;
         case TestResult::FAIL:
             failedTests_++;
-            std::cout << "✗ " << testName << " FAILED: " << error << "\n\n";
+            std::cout << testName << " FAILED: " << error << "\n\n";
             errors_.push_back(testName + ": " + error);
             break;
         case TestResult::TIMEOUT:
             failedTests_++;
-            std::cout << "✗ " << testName << " TIMED OUT\n\n";
+            std::cout << testName << " TIMED OUT\n\n";
             errors_.push_back(testName + ": Timeout");
             break;
         case TestResult::ERROR:
             failedTests_++;
-            std::cout << "✗ " << testName << " ERROR: " << error << "\n\n";
+            std::cout << testName << " ERROR: " << error << "\n\n";
             errors_.push_back(testName + ": " + error);
             break;
     }

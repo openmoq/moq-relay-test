@@ -14,7 +14,7 @@ public:
   explicit TestSubscriptionHandle(moxygen::SubscribeOk ok);
   
   void unsubscribe() override;
-  bool unsubscribe_called() const { return unsubscribe_called_; }
+  bool wasUnsubscribed() const { return unsubscribe_called_; }
   folly::coro::Task<SubscribeUpdateResult>
   subscribeUpdate(moxygen::SubscribeUpdate subUpdate) override;
 
