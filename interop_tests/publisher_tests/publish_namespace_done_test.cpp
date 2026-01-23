@@ -1,24 +1,26 @@
 #include "base/base_test.h"
-#include "moxygen_adapter/moxygen_mocks.h"
-#include "test_registry.h"
 #include "moxygen_adapter/moxygen_fixture.h"
 #include "moxygen_adapter/moxygen_interface.h"
+#include "test_registry.h"
 #include <folly/coro/BlockingWait.h>
-
 
 namespace interop_test {
 class PublishNamespaceDoneTest : public BaseTest {
 public:
-  explicit PublishNamespaceDoneTest(const TestContext &context) : BaseTest(context) {}
+  explicit PublishNamespaceDoneTest(const TestContext &context)
+      : BaseTest(context) {}
   ~PublishNamespaceDoneTest() override = default;
 
   std::string getName() const override { return "PublishNamespaceDoneTest"; }
   std::string getDescription() const override {
-    return "Verifies that a publisher can signal publish done for a namespace to the relay";
+    return "Verifies that a publisher can signal publish done for a namespace "
+           "to the relay";
   }
   TestCategory getCategory() const override { return TestCategory::ALL; }
+
 protected:
   TestResult execute() override;
+
 private:
   std::string trackNamespace_{"test/namespace"};
 };
@@ -35,11 +37,12 @@ TestResult PublishNamespaceDoneTest::execute() {
 
   // Send publish done request
   log("Sending publish done request...");
-  bool publishDoneResult = folly::coro::blockingWait(
-      publisher->unannounce(trackNamespace_));
+  bool publishDoneResult =
+      folly::coro::blockingWait(publisher->unannounce(trackNamespace_));
 
   // Verify publish done succeeded
-  assertTrue(publishDoneResult, "Publish namespace done request should succeed");
+  assertTrue(publishDoneResult,
+             "Publish namespace done request should succeed");
   log("Publish namespace done successful");
 
   return TestResult::PASS;

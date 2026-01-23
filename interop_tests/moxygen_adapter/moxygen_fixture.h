@@ -1,11 +1,11 @@
 #pragma once
 
-#include <memory>
-#include <string>
-#include <chrono>
-#include <folly/io/async/EventBase.h>
 #include "moxygen_adapter/moxygen_interface.h"
 #include "moxygen_adapter/moxygen_mocks.h"
+#include <chrono>
+#include <folly/io/async/EventBase.h>
+#include <memory>
+#include <string>
 
 namespace interop_test {
 
@@ -13,14 +13,15 @@ namespace interop_test {
 struct TestContext;
 
 /**
- * Test Fixture - Provides common setup/teardown and resource management for tests
- * 
+ * Test Fixture - Provides common setup/teardown and resource management for
+ * tests
+ *
  * Purpose:
  * - Eliminates code duplication across tests
  * - Manages MoQ connections (publisher/subscriber)
  * - Provides reusable test resources (subscription handles, track consumers)
  * - Ensures proper cleanup of resources
- * 
+ *
  * Usage:
  *   auto publisher = fixture_->getPublisher();
  *   auto subscriber = fixture_->getSubscriber();
@@ -28,88 +29,91 @@ struct TestContext;
  */
 class TestFixture {
 public:
-    explicit TestFixture(const TestContext& context);
-    ~TestFixture() = default;
+  explicit TestFixture(const TestContext &context);
+  ~TestFixture() = default;
 
-    /**
-     * Initialize the fixture (called before test execution)
-     */
-    void setUp();
+  /**
+   * Initialize the fixture (called before test execution)
+   */
+  void setUp();
 
-    /**
-     * Cleanup all resources (called after test execution)
-     */
-    void tearDown();
+  /**
+   * Cleanup all resources (called after test execution)
+   */
+  void tearDown();
 
-    /**
-     * Get or create a publisher connection
-     * The connection is established on first call and reused
-     * @return Shared pointer to MoxygenInterface configured as publisher
-     */
-    std::shared_ptr<MoxygenInterface> getPublisher();
+  /**
+   * Get or create a publisher connection
+   * The connection is established on first call and reused
+   * @return Shared pointer to MoxygenInterface configured as publisher
+   */
+  std::shared_ptr<MoxygenInterface> getPublisher();
 
-    /**
-     * Get or create a subscriber connection
-     * The connection is established on first call and reused
-     * @return Shared pointer to MoxygenInterface configured as subscriber
-     */
-    std::shared_ptr<MoxygenInterface> getSubscriber();
+  /**
+   * Get or create a subscriber connection
+   * The connection is established on first call and reused
+   * @return Shared pointer to MoxygenInterface configured as subscriber
+   */
+  std::shared_ptr<MoxygenInterface> getSubscriber();
 
-    /**
-     * Create a fresh MoQ interface (not cached)
-     * Useful for tests that need multiple connections
-     * @param autoConnect If true, automatically connects to relay
-     * @return New MoxygenInterface instance
-     */
-    std::shared_ptr<MoxygenInterface> createMoQInterface(bool autoConnect = false);
+  /**
+   * Create a fresh MoQ interface (not cached)
+   * Useful for tests that need multiple connections
+   * @param autoConnect If true, automatically connects to relay
+   * @return New MoxygenInterface instance
+   */
+  std::shared_ptr<MoxygenInterface>
+  createMoQInterface(bool autoConnect = false);
 
-    /**
-     * Create a test subscription handle
-     * @return New TestSubscriptionHandle instance
-     */
-    std::shared_ptr<TestSubscriptionHandle> createSubscriptionHandle();
+  /**
+   * Create a test subscription handle
+   * @return New TestSubscriptionHandle instance
+   */
+  std::shared_ptr<TestSubscriptionHandle> createSubscriptionHandle();
 
-    /**
-     * Get the event base for async operations
-     */
-    folly::EventBase* getEventBase() const { return eventBase_; }
+  /**
+   * Get the event base for async operations
+   */
+  folly::EventBase *getEventBase() const { return eventBase_; }
 
-    /**
-     * Get the relay URL
-     */
-    const std::string& getRelayUrl() const { return relayUrl_; }
+  /**
+   * Get the relay URL
+   */
+  const std::string &getRelayUrl() const { return relayUrl_; }
 
-    /**
-     * Get the default timeout
-     */
-    std::chrono::milliseconds getTimeout() const { return timeout_; }
+  /**
+   * Get the default timeout
+   */
+  std::chrono::milliseconds getTimeout() const { return timeout_; }
 
-    /**
-     * Check if a resource is ready
-     */
-    bool hasPublisher() const { return publisher_ && publisher_->isConnected(); }
-    bool hasSubscriber() const { return subscriber_ && subscriber_->isConnected(); }
+  /**
+   * Check if a resource is ready
+   */
+  bool hasPublisher() const { return publisher_ && publisher_->isConnected(); }
+  bool hasSubscriber() const {
+    return subscriber_ && subscriber_->isConnected();
+  }
 
-    /**
-     * Reset specific resources (for tests that need to reconnect)
-     */
-    void resetPublisher();
-    void resetSubscriber();
+  /**
+   * Reset specific resources (for tests that need to reconnect)
+   */
+  void resetPublisher();
+  void resetSubscriber();
 
 private:
-    // Configuration
-    folly::EventBase* eventBase_;
-    std::string relayUrl_;
-    std::chrono::milliseconds timeout_;
+  // Configuration
+  folly::EventBase *eventBase_;
+  std::string relayUrl_;
+  std::chrono::milliseconds timeout_;
 
-    // Managed resources
-    std::shared_ptr<MoxygenInterface> publisher_;
-    std::shared_ptr<MoxygenInterface> subscriber_;
-    std::vector<std::shared_ptr<MoxygenInterface>> additionalInterfaces_;
+  // Managed resources
+  std::shared_ptr<MoxygenInterface> publisher_;
+  std::shared_ptr<MoxygenInterface> subscriber_;
+  std::vector<std::shared_ptr<MoxygenInterface>> additionalInterfaces_;
 
-    // Helper methods
-    void cleanupInterface(std::shared_ptr<MoxygenInterface>& interface, 
-                         const std::string& name);
+  // Helper methods
+  void cleanupInterface(std::shared_ptr<MoxygenInterface> &interface,
+                        const std::string &name);
 };
 
 } // namespace interop_test

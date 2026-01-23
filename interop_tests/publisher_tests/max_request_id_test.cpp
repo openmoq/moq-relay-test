@@ -1,8 +1,7 @@
-#include "moxygen_adapter/moxygen_mocks.h"
-#include "test_registry.h"
 #include "base/base_test.h"
 #include "moxygen_adapter/moxygen_fixture.h"
 #include "moxygen_adapter/moxygen_interface.h"
+#include "test_registry.h"
 #include <folly/coro/BlockingWait.h>
 #include <memory>
 #include <string>
@@ -15,14 +14,11 @@ namespace interop_test {
  */
 class MaxRequestIdTest : public BaseTest {
 public:
-  explicit MaxRequestIdTest(const TestContext &context)
-      : BaseTest(context) {}
+  explicit MaxRequestIdTest(const TestContext &context) : BaseTest(context) {}
   ~MaxRequestIdTest() override = default;
 
   // BaseTest interface
-  std::string getName() const override {
-    return "MaxRequestIdTest";
-  }
+  std::string getName() const override { return "MaxRequestIdTest"; }
   std::string getDescription() const override {
     return "Verifies that a client can successfully set the maximum "
            "concurrent requests on a MoQ session";

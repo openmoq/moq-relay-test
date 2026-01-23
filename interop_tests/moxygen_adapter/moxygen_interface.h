@@ -49,9 +49,9 @@ public:
    * @param subscriptionHandle Optional subscription handle
    * @return Task that resolves to true on success
    */
-  folly::coro::Task<bool> publish(const std::string &trackNamespace, 
-                                    const std::string &trackName,
-                                    std::shared_ptr<TestSubscriptionHandle> externalHandle = nullptr);
+  folly::coro::Task<bool>
+  publish(const std::string &trackNamespace, const std::string &trackName,
+          std::shared_ptr<TestSubscriptionHandle> externalHandle = nullptr);
 
   /**
    * Subscribes to a track on the MoQ relay
@@ -68,6 +68,11 @@ public:
             uint8_t priority = 128,
             moxygen::GroupOrder groupOrder = moxygen::GroupOrder::OldestFirst);
 
+  folly::coro::Task<bool> subscribeUpdate(const std::string &trackNamespace, const std::string &trackName,
+            std::shared_ptr<moxygen::TrackConsumer> trackConsumer,
+            uint8_t priority = 128,
+            moxygen::GroupOrder groupOrder = moxygen::GroupOrder::OldestFirst);
+
   /**
    * Announces a namespace to the MoQ relay
    * @param trackNamespace The namespace to announce (e.g., "video/conference")
@@ -77,7 +82,8 @@ public:
 
   /**
    * Signals publish done for a namespace to the MoQ relay
-   * @param trackNamespace The namespace to unannounce (e.g., "video/conference")
+   * @param trackNamespace The namespace to unannounce (e.g.,
+   * "video/conference")
    * @return Task that resolves to true on success
    */
   folly::coro::Task<bool> unannounce(const std::string &trackNamespace);
@@ -87,8 +93,7 @@ public:
    * @param trackNamespace The namespace prefix to subscribe to (e.g., "video/")
    * @return Task that resolves to true on success
    */
-  folly::coro::Task<bool> subscribeAnnounces(
-      const std::string &trackNamespace);
+  folly::coro::Task<bool> subscribeAnnounces(const std::string &trackNamespace);
 
   /**
    * Sends a track status request to the MoQ relay
@@ -97,27 +102,32 @@ public:
    * @return Task that resolves to true on success
    */
   folly::coro::Task<bool> trackStatus(const std::string &trackNamespace,
-                                       const std::string &trackName);
+                                      const std::string &trackName);
 
-    /**
-     * Sends a goaway signal to the MoQ relay
-     * @return Task that resolves to true on success
-     */
-    folly::coro::Task<bool> goaway();
+  /**
+   * Sends a goaway signal to the MoQ relay
+   * @return Task that resolves to true on success
+   */
+  folly::coro::Task<bool> goaway();
 
-    /**
-     * Sends a goaway signal after publishing a dummy track
-     * @return Task that resolves to true on success
-     */
-    folly::coro::Task<bool> goaway_sequence();
+  /**
+   * Sends a goaway signal after publishing a dummy track
+   * @return Task that resolves to true on success
+   */
+  folly::coro::Task<bool> goaway_sequence();
 
-    folly::coro::Task<bool> setMaxConcurrentRequests(uint32_t maxConcurrentRequests);
+  folly::coro::Task<bool>
+  setMaxConcurrentRequests(uint32_t maxConcurrentRequests);
 
   std::shared_ptr<moxygen::MoQClient> getClient() const { return client_; }
 
   bool isConnected() const { return client_ && client_->moqSession_; }
 
 private:
+  folly::coro::Task<moxygen::MoQRelaySession::SubscribeResult> _subscribe(
+      moxygen::SubscribeRequest subscribeReq,
+      std::shared_ptr<moxygen::TrackConsumer> trackConsumer);
+
   folly::EventBase *eventBase_;
   std::shared_ptr<moxygen::MoQClient> client_;
   std::shared_ptr<moxygen::MoQRelaySession>

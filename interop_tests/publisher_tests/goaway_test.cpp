@@ -1,8 +1,7 @@
-#include "moxygen_adapter/moxygen_mocks.h"
-#include "test_registry.h"
 #include "base/base_test.h"
 #include "moxygen_adapter/moxygen_fixture.h"
 #include "moxygen_adapter/moxygen_interface.h"
+#include "test_registry.h"
 #include <folly/coro/BlockingWait.h>
 #include <memory>
 #include <string>
@@ -43,8 +42,7 @@ TestResult GoawayTest::execute() {
 
   // Execute goaway sequence (publishes a dummy track and sends goaway)
   log("Sending goaway sequence...");
-  bool goawayResult = folly::coro::blockingWait(
-      publisher->goaway_sequence());
+  bool goawayResult = folly::coro::blockingWait(publisher->goaway_sequence());
 
   // Verify goaway sequence succeeded
   assertTrue(goawayResult, "Goaway sequence should succeed");

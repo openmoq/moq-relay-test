@@ -12,7 +12,7 @@ class TestSubscriptionHandle : public moxygen::SubscriptionHandle {
 public:
   TestSubscriptionHandle() = default;
   explicit TestSubscriptionHandle(moxygen::SubscribeOk ok);
-  
+
   void unsubscribe() override;
   bool wasUnsubscribed() const { return unsubscribe_called_; }
   folly::coro::Task<SubscribeUpdateResult>

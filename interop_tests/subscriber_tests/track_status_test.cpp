@@ -1,8 +1,7 @@
-#include "moxygen_adapter/moxygen_mocks.h"
-#include "test_registry.h"
 #include "base/base_test.h"
 #include "moxygen_adapter/moxygen_fixture.h"
 #include "moxygen_adapter/moxygen_interface.h"
+#include "test_registry.h"
 #include <folly/coro/BlockingWait.h>
 #include <memory>
 #include <moxygen/MoQConsumers.h>
@@ -41,23 +40,22 @@ private:
 REGISTER_TEST(TrackStatusTest);
 
 TestResult TrackStatusTest::execute() {
-  log("Testing track status for track: " + trackNamespace_ + "/" +
-      trackName_);
+  log("Testing track status for track: " + trackNamespace_ + "/" + trackName_);
 
   // First publish a track
-//   log("Publishing track");
-//   auto publisher = fixture_->getPublisher();
-//   assertNotNull(publisher.get(), "Publisher interface should not be null");
-//   assertTrue(publisher->isConnected(), "Publisher should be connected");
+  //   log("Publishing track");
+  //   auto publisher = fixture_->getPublisher();
+  //   assertNotNull(publisher.get(), "Publisher interface should not be null");
+  //   assertTrue(publisher->isConnected(), "Publisher should be connected");
 
-//   auto subscriptionHandle = fixture_->createSubscriptionHandle();
-//   bool publishResult = folly::coro::blockingWait(
-//       publisher->publish(trackNamespace_, trackName_, subscriptionHandle));
-//   assertTrue(publishResult, "Publish request should succeed");
-//   log("Publish successful");
+  //   auto subscriptionHandle = fixture_->createSubscriptionHandle();
+  //   bool publishResult = folly::coro::blockingWait(
+  //       publisher->publish(trackNamespace_, trackName_, subscriptionHandle));
+  //   assertTrue(publishResult, "Publish request should succeed");
+  //   log("Publish successful");
 
   // Give the relay time to process the publish request
-//   std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  //   std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
   // Request track status from a different connection
   log("Requesting track status");

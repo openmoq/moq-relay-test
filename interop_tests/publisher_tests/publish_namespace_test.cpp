@@ -1,15 +1,15 @@
 #include "base/base_test.h"
-#include "moxygen_adapter/moxygen_mocks.h"
-#include "test_registry.h"
 #include "moxygen_adapter/moxygen_fixture.h"
 #include "moxygen_adapter/moxygen_interface.h"
+#include "test_registry.h"
 #include <folly/coro/BlockingWait.h>
 
 namespace interop_test {
 
 class PublishNamespaceTest : public BaseTest {
 public:
-  explicit PublishNamespaceTest(const TestContext &context) : BaseTest(context) {}
+  explicit PublishNamespaceTest(const TestContext &context)
+      : BaseTest(context) {}
   ~PublishNamespaceTest() override = default;
 
   std::string getName() const override { return "PublishNamespaceTest"; }
@@ -37,8 +37,8 @@ TestResult PublishNamespaceTest::execute() {
 
   // Send announce request
   log("Sending announce request...");
-  bool announceResult = folly::coro::blockingWait(
-      publisher->announce(trackNamespace_));
+  bool announceResult =
+      folly::coro::blockingWait(publisher->announce(trackNamespace_));
 
   // Verify announce succeeded
   assertTrue(announceResult, "Announce request should succeed");

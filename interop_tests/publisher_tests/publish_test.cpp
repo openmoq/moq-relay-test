@@ -1,8 +1,7 @@
-#include "moxygen_adapter/moxygen_mocks.h"
-#include "test_registry.h"
 #include "base/base_test.h"
 #include "moxygen_adapter/moxygen_fixture.h"
 #include "moxygen_adapter/moxygen_interface.h"
+#include "test_registry.h"
 #include <folly/coro/BlockingWait.h>
 #include <memory>
 #include <string>
@@ -46,9 +45,9 @@ TestResult PublishTest::execute() {
   assertTrue(publisher->isConnected(), "Publisher should be connected");
 
   // Create subscription handle
-//   auto subscriptionHandle = fixture_->createSubscriptionHandle();
-//   assertNotNull(subscriptionHandle.get(),
-//                 "Subscription handle should not be null");
+  //   auto subscriptionHandle = fixture_->createSubscriptionHandle();
+  //   assertNotNull(subscriptionHandle.get(),
+  //                 "Subscription handle should not be null");
 
   // Send publish request
   log("Sending publish request...");

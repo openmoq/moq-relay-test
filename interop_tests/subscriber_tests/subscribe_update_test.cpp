@@ -11,20 +11,20 @@
 namespace interop_test {
 
 /**
- * Basic subscribe test - verifies that a client can subscribe to a published
- * track
+ * Subscribe Update test - verifies that a client can send a subscribe update
+ * after subscribing to a track
  */
-class SubscribeTest : public BaseTest {
+class SubscribeUpdateTest : public BaseTest {
 public:
-  explicit SubscribeTest(const TestContext &context) : BaseTest(context) {}
+  explicit SubscribeUpdateTest(const TestContext &context) : BaseTest(context) {}
 
-  ~SubscribeTest() override = default;
+  ~SubscribeUpdateTest() override = default;
 
   // BaseTest interface
-  std::string getName() const override { return "SubscribeTest"; }
+  std::string getName() const override { return "SubscribeUpdateTest"; }
   std::string getDescription() const override {
-    return "Verifies that a client can subscribe to a published track via the "
-           "relay";
+    return "Verifies that a client can send a subscribe update message after "
+           "subscribing to a track";
   }
   TestCategory getCategory() const override { return TestCategory::ALL; }
 
@@ -39,10 +39,10 @@ private:
 };
 
 // Auto-register this test
-REGISTER_TEST(SubscribeTest);
+REGISTER_TEST(SubscribeUpdateTest);
 
-TestResult SubscribeTest::execute() {
-  log("Testing publish and subscribe for track: " + trackNamespace_ + "/" +
+TestResult SubscribeUpdateTest::execute() {
+  log("Testing subscribe update for track: " + trackNamespace_ + "/" +
       trackName_);
 
   // First publish a track
@@ -59,19 +59,13 @@ TestResult SubscribeTest::execute() {
   // Give the relay time to process the publish request
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-  // Subscribe to the track from a different connection
-  log("Subscribing to track");
+  // Send subscribe update
+  log("Sending subscribe update");
   auto subscriber = fixture_->getSubscriber();
-  assertNotNull(subscriber.get(), "Subscriber interface should not be null");
-  assertTrue(subscriber->isConnected(), "Subscriber should be connected");
-  assertNotNull(trackConsumer_.get(), "Track consumer should not be null");
+  bool updateResult = folly::coro::blockingWait(subscriber->subscribeUpdate(trackNamespace_, trackName_, trackConsumer_));
+  assertTrue(updateResult, "Subscribe update request should succeed");
+  log("Subscribe update successful");
 
-  bool subscribed = folly::coro::blockingWait(
-      subscriber->subscribe(trackNamespace_, trackName_, trackConsumer_));
-  assertTrue(subscribed, "Subscribe request should succeed");
-  log("Subscribe successful");
-
-  log("Publisher and subscriber are using separate connections");
   return TestResult::PASS;
 }
 } // namespace interop_test

@@ -26,8 +26,7 @@ TestSubscriptionHandle::subscribeUpdate(moxygen::SubscribeUpdate subUpdate) {
 // TestTrackConsumer implementations
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
 TestTrackConsumer::setTrackAlias(moxygen::TrackAlias alias) {
-  std::cout << "TestTrackConsumer::setTrackAlias: " << alias.value
-            << std::endl;
+  std::cout << "TestTrackConsumer::setTrackAlias: " << alias.value << std::endl;
   return folly::unit;
 }
 

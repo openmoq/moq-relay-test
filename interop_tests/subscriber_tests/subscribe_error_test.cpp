@@ -1,8 +1,7 @@
-#include "moxygen_adapter/moxygen_mocks.h"
-#include "test_registry.h"
 #include "base/base_test.h"
 #include "moxygen_adapter/moxygen_fixture.h"
 #include "moxygen_adapter/moxygen_interface.h"
+#include "test_registry.h"
 #include <folly/coro/BlockingWait.h>
 #include <memory>
 #include <moxygen/MoQConsumers.h>
@@ -18,7 +17,8 @@ public:
 
   std::string getName() const override { return "SubscribeErrorTest"; }
   std::string getDescription() const override {
-    return "Verifies that a client receives an error when subscribing to a non-existent track";
+    return "Verifies that a client receives an error when subscribing to a "
+           "non-existent track";
   }
   TestCategory getCategory() const override { return TestCategory::ALL; }
 
@@ -35,8 +35,8 @@ private:
 REGISTER_TEST(SubscribeErrorTest);
 
 TestResult SubscribeErrorTest::execute() {
-  log("Testing subscribe error for non-existent track: " + trackNamespace_ + "/" +
-      trackName_);
+  log("Testing subscribe error for non-existent track: " + trackNamespace_ +
+      "/" + trackName_);
 
   // Attempt to subscribe to a non-existent track
   log("Subscribing to non-existent track");
@@ -46,9 +46,10 @@ TestResult SubscribeErrorTest::execute() {
 
   bool subscribeResult = folly::coro::blockingWait(
       subscriber->subscribe(trackNamespace_, trackName_, trackConsumer_));
-  
+
   // Verify that the subscribe resulted in an error
-  assertFalse(subscribeResult, "Subscribe request should fail for non-existent track");
+  assertFalse(subscribeResult,
+              "Subscribe request should fail for non-existent track");
   log("Subscribe error received as expected");
 
   return TestResult::PASS;
