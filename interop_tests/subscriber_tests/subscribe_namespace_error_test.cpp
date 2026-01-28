@@ -40,7 +40,7 @@ TestResult SubscribeNamespaceErrorTest::execute() {
   // Send subscribe request without announcing first
   log("Sending subscribe namespace request without prior announce...");
   bool subscribeResult = folly::coro::blockingWait(
-      subscriber->subscribeAnnounces(trackNamespace_));
+      subscriber->subscribe_namespace(trackNamespace_));
 
   // Verify subscribe failed as expected
   assertFalse(subscribeResult,

@@ -38,7 +38,7 @@ TestResult PublishNamespaceTest::execute() {
   // Send announce request
   log("Sending announce request...");
   bool announceResult =
-      folly::coro::blockingWait(publisher->announce(trackNamespace_));
+      folly::coro::blockingWait(publisher->publish_namespace(trackNamespace_));
 
   // Verify announce succeeded
   assertTrue(announceResult, "Announce request should succeed");

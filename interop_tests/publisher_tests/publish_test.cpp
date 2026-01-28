@@ -44,11 +44,6 @@ TestResult PublishTest::execute() {
   assertNotNull(publisher.get(), "Publisher interface should not be null");
   assertTrue(publisher->isConnected(), "Publisher should be connected");
 
-  // Create subscription handle
-  //   auto subscriptionHandle = fixture_->createSubscriptionHandle();
-  //   assertNotNull(subscriptionHandle.get(),
-  //                 "Subscription handle should not be null");
-
   // Send publish request
   log("Sending publish request...");
   bool publishResult = folly::coro::blockingWait(

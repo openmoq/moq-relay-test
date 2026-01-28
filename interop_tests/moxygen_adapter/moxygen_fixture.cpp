@@ -7,16 +7,16 @@
 
 namespace interop_test {
 
-TestFixture::TestFixture(const TestContext &context)
+MoxygenTestFixture::MoxygenTestFixture(const TestContext &context)
     : eventBase_(context.eventBase), relayUrl_(context.relayUrl),
       timeout_(context.defaultTimeout) {}
 
-void TestFixture::setUp() {
+void MoxygenTestFixture::setUp() {
   // Currently no global setup needed
   // Resources are created lazily on demand
 }
 
-void TestFixture::tearDown() {
+void MoxygenTestFixture::tearDown() {
   std::cout << "  [Fixture] Starting cleanup..." << std::endl;
 
   // Clean up all additional interfaces
@@ -38,7 +38,7 @@ void TestFixture::tearDown() {
   std::cout << "  [Fixture] Cleanup completed" << std::endl;
 }
 
-std::shared_ptr<MoxygenInterface> TestFixture::getPublisher() {
+std::shared_ptr<MoqtInterface> MoxygenTestFixture::getPublisher() {
   if (!publisher_) {
     std::cout << "  [Fixture] Creating publisher connection..." << std::endl;
     publisher_ = std::make_shared<MoxygenInterface>(eventBase_);
@@ -63,7 +63,7 @@ std::shared_ptr<MoxygenInterface> TestFixture::getPublisher() {
   return publisher_;
 }
 
-std::shared_ptr<MoxygenInterface> TestFixture::getSubscriber() {
+std::shared_ptr<MoqtInterface> MoxygenTestFixture::getSubscriber() {
   if (!subscriber_) {
     std::cout << "  [Fixture] Creating subscriber connection..." << std::endl;
     subscriber_ = std::make_shared<MoxygenInterface>(eventBase_);
@@ -88,8 +88,8 @@ std::shared_ptr<MoxygenInterface> TestFixture::getSubscriber() {
   return subscriber_;
 }
 
-std::shared_ptr<MoxygenInterface>
-TestFixture::createMoQInterface(bool autoConnect) {
+std::shared_ptr<MoqtInterface>
+MoxygenTestFixture::createMoQInterface(bool autoConnect) {
   std::cout << "\n[INTERFACE] Creating new MoQ interface..." << std::endl;
 
   auto interface = std::make_shared<MoxygenInterface>(eventBase_);
@@ -116,26 +116,21 @@ TestFixture::createMoQInterface(bool autoConnect) {
   return interface;
 }
 
-// std::shared_ptr<TestSubscriptionHandle>
-// TestFixture::createSubscriptionHandle() {
-//     return std::make_shared<TestSubscriptionHandle>();
-// }
-
-void TestFixture::resetPublisher() {
+void MoxygenTestFixture::resetPublisher() {
   if (publisher_) {
     std::cout << "  [Fixture] Resetting publisher..." << std::endl;
     cleanupInterface(publisher_, "publisher");
   }
 }
 
-void TestFixture::resetSubscriber() {
+void MoxygenTestFixture::resetSubscriber() {
   if (subscriber_) {
     std::cout << "  [Fixture] Resetting subscriber..." << std::endl;
     cleanupInterface(subscriber_, "subscriber");
   }
 }
 
-void TestFixture::cleanupInterface(std::shared_ptr<MoxygenInterface> &interface,
+void MoxygenTestFixture::cleanupInterface(std::shared_ptr<MoxygenInterface> &interface,
                                    const std::string &name) {
   if (!interface) {
     return;

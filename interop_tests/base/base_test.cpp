@@ -1,11 +1,10 @@
 #include "base_test.h"
-#include "moxygen_adapter/moxygen_fixture.h"
 #include <iostream>
 
 namespace interop_test {
 
 BaseTest::BaseTest(const TestContext &context)
-    : context_(context), fixture_(std::make_shared<TestFixture>(context)) {}
+    : context_(context), fixture_(nullptr) {}
 
 TestResult BaseTest::run() {
   logAlways("Running test: " + getName());
@@ -16,7 +15,9 @@ TestResult BaseTest::run() {
     // Setup phase
     log("Setting up test...");
     setUp();
-    fixture_->setUp();
+    if (fixture_) {
+      fixture_->setUp();
+    }
 
     // Execute phase
     log("Executing test...");
@@ -25,7 +26,9 @@ TestResult BaseTest::run() {
     // Teardown phase (always run, even on failure)
     log("Tearing down test...");
     tearDown();
-    fixture_->tearDown();
+    if (fixture_) {
+      fixture_->tearDown();
+    }
 
     if (result == TestResult::PASS) {
       logAlways("✓ Test PASSED");
@@ -39,7 +42,9 @@ TestResult BaseTest::run() {
     // Ensure teardown runs even if exception thrown
     try {
       tearDown();
-      fixture_->tearDown();
+      if (fixture_) {
+        fixture_->tearDown();
+      }
     } catch (const std::exception &teardownEx) {
       std::cerr << "Exception during teardown: " << teardownEx.what()
                 << std::endl;

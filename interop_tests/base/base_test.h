@@ -1,5 +1,6 @@
 #pragma once
 
+#include "base/test_fixture_interface.h"
 #include <chrono>
 #include <folly/io/async/EventBase.h>
 #include <memory>
@@ -7,9 +8,6 @@
 #include <vector>
 
 namespace interop_test {
-
-// Forward declaration
-class TestFixture;
 
 enum class TestResult { PASS, FAIL, TIMEOUT, ERROR };
 
@@ -79,6 +77,11 @@ public:
   virtual std::vector<std::string> getDependencies() const { return {}; }
 
   /**
+   * Set the test fixture (called by derived classes or test framework)
+   */
+  void setFixture(std::shared_ptr<ITestFixture> fixture) { fixture_ = fixture; }
+
+  /**
    * Get the last error message if test failed
    */
   std::string getLastError() const { return lastError_; }
@@ -138,7 +141,7 @@ protected:
 
   // Access to shared context and fixture
   const TestContext &context_;
-  std::shared_ptr<TestFixture> fixture_;
+  std::shared_ptr<ITestFixture> fixture_;
 
 private:
   std::string lastError_;

@@ -28,18 +28,6 @@ REGISTER_TEST(SubscribeNamespaceTest);
 TestResult SubscribeNamespaceTest::execute() {
   log("Subscribing to namespace: " + trackNamespace_);
 
-  // First publish a track in the namespace to ensure it exists
-  // log("Publishing track in namespace");
-  // auto publisher = fixture_->getPublisher();
-  // assertNotNull(publisher.get(), "Publisher interface should not be null");
-  // assertTrue(publisher->isConnected(), "Publisher should be connected");
-  // std::string trackName = "interop-track";
-  // auto subscriptionHandle = fixture_->createSubscriptionHandle();
-  // bool announceResult = folly::coro::blockingWait(
-  //   publisher->announce(trackNamespace_));
-  // assertTrue(announceResult, "Announce request should succeed");
-  // log("Announce successful");
-
   // Get subscriber connection from fixture
   auto subscriber = fixture_->getSubscriber();
   assertNotNull(subscriber.get(), "Subscriber interface should not be null");
@@ -52,7 +40,7 @@ TestResult SubscribeNamespaceTest::execute() {
   // Send subscribe request
   log("Sending subscribe namespace request...");
   bool subscribeResult = folly::coro::blockingWait(
-      subscriber->subscribeAnnounces(trackNamespace_));
+      subscriber->subscribe_namespace(trackNamespace_));
 
   // Verify subscribe succeeded
   assertTrue(subscribeResult, "Subscribe request should succeed");
