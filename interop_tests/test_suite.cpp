@@ -133,7 +133,7 @@ void TestSuite::printSummary() const {
 
   std::cout << "\n";
   if (failedTests_ == 0) {
-    std::cout << "All tests passed! ✓\n";
+    std::cout << "All tests passed! \n";
   } else {
     std::cout << "Some tests failed.\n";
   }

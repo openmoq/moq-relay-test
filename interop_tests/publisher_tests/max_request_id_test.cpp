@@ -46,8 +46,7 @@ TestResult MaxRequestIdTest::execute() {
 
   // Set max concurrent requests
   log("Calling setMaxConcurrentRequests...");
-  bool result = folly::coro::blockingWait(
-      publisher->setMaxConcurrentRequests(maxConcurrentRequests_));
+  bool result = publisher->setMaxConcurrentRequests(maxConcurrentRequests_);
 
   // Verify the call succeeded
   assertTrue(result, "setMaxConcurrentRequests should succeed");

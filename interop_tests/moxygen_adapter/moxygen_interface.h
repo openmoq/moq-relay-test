@@ -36,23 +36,23 @@ public:
    * @param connectTimeout Connection timeout
    * @param transactionTimeout Transaction timeout
    * @param useInsecureVerifier Whether to use insecure certificate verification
-   * @return Task that resolves to true on success
+   * @return true on success
    */
-  folly::coro::Task<bool> connect(const std::string &url,
-                                  std::chrono::milliseconds connectTimeout =
-                                      std::chrono::milliseconds(30000),
-                                  std::chrono::milliseconds transactionTimeout =
-                                      std::chrono::milliseconds(30000),
-                                  bool useInsecureVerifier = true) override;
+  bool connect(const std::string &url,
+               std::chrono::milliseconds connectTimeout =
+                   std::chrono::milliseconds(30000),
+               std::chrono::milliseconds transactionTimeout =
+                   std::chrono::milliseconds(30000),
+               bool useInsecureVerifier = true) override;
 
   /**
    * Sends a publish request to the MoQ relay
    * @param trackNamespace The track namespace
    * @param trackName The track name
    * @param subscriptionHandle Optional subscription handle
-   * @return Task that resolves to true on success
+   * @return true on success
    */
-  folly::coro::Task<bool>
+  bool
   publish(const std::string &trackNamespace, const std::string &trackName) override;
 
   /**
@@ -62,14 +62,14 @@ public:
    * @param trackConsumer Callback to receive track data
    * @param priority Subscribe priority (default: 128)
    * @param groupOrder Group ordering preference (default: OldestFirst)
-   * @return Task that resolves to true on success
+   * @return true on success
    */
-  folly::coro::Task<bool>
+  bool
   subscribe(const std::string &trackNamespace, const std::string &trackName,
             uint8_t priority = 128,
             GroupOrder groupOrder = GroupOrder::OldestFirst) override;
 
-  folly::coro::Task<bool> subscribeUpdate(const std::string &trackNamespace, const std::string &trackName,
+  bool subscribeUpdate(const std::string &trackNamespace, const std::string &trackName,
             uint8_t priority = 128,
             GroupOrder groupOrder = GroupOrder::OldestFirst,
             AbsoluteLocation start = AbsoluteLocation{0,0},
@@ -78,47 +78,47 @@ public:
   /**
    * Announces a namespace to the MoQ relay
    * @param trackNamespace The namespace to announce (e.g., "video/conference")
-   * @return Task that resolves to true on success
+   * @return true on success
    */
-  folly::coro::Task<bool> publish_namespace(const std::string &trackNamespace) override;
+  bool publish_namespace(const std::string &trackNamespace) override;
 
   /**
    * Signals publish done for a namespace to the MoQ relay
    * @param trackNamespace The namespace to unannounce (e.g.,
    * "video/conference")
-   * @return Task that resolves to true on success
+   * @return true on success
    */
-  folly::coro::Task<bool> publish_namespace_done(const std::string &trackNamespace) override;
+  bool publish_namespace_done(const std::string &trackNamespace) override;
 
   /**
    * Subscribes to announces for a given namespace prefix
    * @param trackNamespace The namespace prefix to subscribe to (e.g., "video/")
-   * @return Task that resolves to true on success
+   * @return true on success
    */
-  folly::coro::Task<bool> subscribe_namespace(const std::string &trackNamespace) override;
+  bool subscribe_namespace(const std::string &trackNamespace) override;
 
   /**
    * Sends a track status request to the MoQ relay
    * @param trackNamespace The track namespace
    * @param trackName The track name
-   * @return Task that resolves to true on success
+   * @return true on success
    */
-  folly::coro::Task<bool> trackStatus(const std::string &trackNamespace,
+  bool trackStatus(const std::string &trackNamespace,
                                       const std::string &trackName) override;
 
   /**
    * Sends a goaway signal to the MoQ relay
-   * @return Task that resolves to true on success
+   * @return true on success
    */
-  folly::coro::Task<bool> goaway() override;
+  bool goaway() override;
 
   /**
    * Sends a goaway signal after publishing a dummy track
-   * @return Task that resolves to true on success
+   * @return true on success
    */
-  folly::coro::Task<bool> goaway_sequence() override;
+  bool goaway_sequence() override;
 
-  folly::coro::Task<bool>
+  bool
   setMaxConcurrentRequests(uint32_t maxConcurrentRequests) override;
 
   std::shared_ptr<moxygen::MoQClient> getClient() const { return client_; }

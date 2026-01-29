@@ -46,8 +46,7 @@ TestResult PublishTest::execute() {
 
   // Send publish request
   log("Sending publish request...");
-  bool publishResult = folly::coro::blockingWait(
-      publisher->publish(trackNamespace_, trackName_));
+  bool publishResult = publisher->publish(trackNamespace_, trackName_);
 
   // Verify publish succeeded
   assertTrue(publishResult, "Publish request should succeed");

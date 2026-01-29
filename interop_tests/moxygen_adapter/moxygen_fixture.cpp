@@ -44,8 +44,7 @@ std::shared_ptr<MoqtInterface> MoxygenTestFixture::getPublisher() {
     publisher_ = std::make_shared<MoxygenInterface>(eventBase_);
 
     try {
-      bool connected =
-          folly::coro::blockingWait(publisher_->connect(relayUrl_));
+      bool connected = publisher_->connect(relayUrl_);
       if (!connected) {
         std::cerr << "  [Fixture] Failed to connect publisher" << std::endl;
         publisher_.reset();
@@ -69,8 +68,7 @@ std::shared_ptr<MoqtInterface> MoxygenTestFixture::getSubscriber() {
     subscriber_ = std::make_shared<MoxygenInterface>(eventBase_);
 
     try {
-      bool connected =
-          folly::coro::blockingWait(subscriber_->connect(relayUrl_));
+      bool connected = subscriber_->connect(relayUrl_);
       if (!connected) {
         std::cerr << "  [Fixture] Failed to connect subscriber" << std::endl;
         subscriber_.reset();
@@ -96,7 +94,7 @@ MoxygenTestFixture::createMoQInterface(bool autoConnect) {
 
   if (autoConnect) {
     try {
-      bool connected = folly::coro::blockingWait(interface->connect(relayUrl_));
+      bool connected = interface->connect(relayUrl_);
       if (!connected) {
         std::cerr << "  [Fixture] Failed to connect new interface" << std::endl;
         throw std::runtime_error("Failed to establish connection");

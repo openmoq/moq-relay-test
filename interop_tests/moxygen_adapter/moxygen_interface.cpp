@@ -2,6 +2,7 @@
 #include "moxygen_mocks.h"
 #include "type_conversions.h"
 #include <folly/futures/Future.h>
+#include <folly/coro/BlockingWait.h>
 #include <iostream>
 
 namespace interop_test {
@@ -13,7 +14,7 @@ MoxygenInterface::MoxygenInterface(folly::EventBase *eventBase)
   }
 }
 
-folly::coro::Task<bool> MoxygenInterface::connect(
+bool MoxygenInterface::connect(
     const std::string &url, std::chrono::milliseconds connectTimeout,
     std::chrono::milliseconds transactionTimeout, bool useInsecureVerifier) {
 
@@ -24,7 +25,7 @@ folly::coro::Task<bool> MoxygenInterface::connect(
     proxygen::URL parsedUrl(url);
     if (!parsedUrl.isValid()) {
       std::cerr << "Invalid URL: " << url << std::endl;
-      co_return false;
+      return false;
     }
 
     std::shared_ptr<fizz::CertificateVerifier> verifier = nullptr;
@@ -37,9 +38,10 @@ folly::coro::Task<bool> MoxygenInterface::connect(
         executor, std::move(parsedUrl),
         moxygen::MoQRelaySession::createRelaySessionFactory(), verifier);
 
-    // Set up MoQ session
-    co_await client_->setupMoQSession(connectTimeout, transactionTimeout,
-                                      nullptr, nullptr, {});
+    // Set up MoQ session using blockingWait
+    folly::coro::blockingWait(
+        client_->setupMoQSession(connectTimeout, transactionTimeout,
+                                nullptr, nullptr, {}));
 
     // Cast once and store for later use
     relaySession_ = std::dynamic_pointer_cast<moxygen::MoQRelaySession>(
@@ -47,17 +49,17 @@ folly::coro::Task<bool> MoxygenInterface::connect(
     if (!relaySession_) {
       std::cerr << "Failed to cast to MoQRelaySession" << std::endl;
       client_.reset();
-      co_return false;
+      return false;
     }
 
     std::cout << "MoQ session established successfully" << std::endl;
-    co_return true;
+    return true;
 
   } catch (const std::exception &ex) {
     std::cerr << "Failed to establish MoQ session: " << ex.what() << std::endl;
     relaySession_.reset();
     client_.reset();
-    co_return false;
+    return false;
   }
 }
 
@@ -122,9 +124,9 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
   }
 }
 
-folly::coro::Task<bool> MoxygenInterface::publish(
+bool MoxygenInterface::publish(
   const std::string &trackNamespace, const std::string &trackName) {
-  co_return co_await _doPublish(trackNamespace, trackName, nullptr);
+  return folly::coro::blockingWait(_doPublish(trackNamespace, trackName, nullptr));
 }
 
 
@@ -151,7 +153,7 @@ folly::coro::Task<moxygen::MoQRelaySession::SubscribeResult> MoxygenInterface::_
 }
 
 
-folly::coro::Task<bool> MoxygenInterface::subscribe(
+bool MoxygenInterface::subscribe(
     const std::string &trackNamespace, const std::string &trackName,
     uint8_t priority,
     GroupOrder groupOrder) {
@@ -159,35 +161,35 @@ folly::coro::Task<bool> MoxygenInterface::subscribe(
   try {
     if (!isConnected()) {
       std::cerr << "No MoQ session available" << std::endl;
-      co_return false;
+      return false;
     }
 
     // Convert interop_test types to moxygen types
     auto moxygenGroupOrder = toMoxygenGroupOrder(groupOrder);
 
     // Send subscribe request via session's subscribe method
-    auto subscribeResult =
-        co_await _doSubscribe(trackNamespace, trackName, priority, moxygenGroupOrder);
+    auto subscribeResult = folly::coro::blockingWait(
+        _doSubscribe(trackNamespace, trackName, priority, moxygenGroupOrder));
 
     if (subscribeResult.hasValue()) {
       auto subscriptionHandle = std::move(subscribeResult.value());
       std::cout << "Subscribe OK received. Track alias: "
                 << subscriptionHandle->subscribeOk().trackAlias.value
                 << std::endl;
-      co_return true;
+      return true;
     } else {
       auto error = subscribeResult.error();
       std::cerr << "Subscribe failed: " << error.reasonPhrase << std::endl;
-      co_return false;
+      return false;
     }
   } catch (const std::exception &ex) {
     std::cerr << "Exception in subscribe: " << ex.what() << std::endl;
-    co_return false;
+    return false;
   }
 }
 
 
-folly::coro::Task<bool> MoxygenInterface::subscribeUpdate(
+bool MoxygenInterface::subscribeUpdate(
     const std::string &trackNamespace, const std::string &trackName,
     uint8_t priority,
     GroupOrder groupOrder,
@@ -197,21 +199,21 @@ folly::coro::Task<bool> MoxygenInterface::subscribeUpdate(
   try {
     if (!isConnected() || !relaySession_) {
       std::cerr << "No MoQ relay session available" << std::endl;
-      co_return false;
+      return false;
     }
 
     // Get a subscription handle and use that to send the subscribe update
-    auto subscribeResult = co_await _doSubscribe(
+    auto subscribeResult = folly::coro::blockingWait(_doSubscribe(
         trackNamespace,
         trackName,
         128,
-        moxygen::GroupOrder::OldestFirst);
+        moxygen::GroupOrder::OldestFirst));
 
     if (!subscribeResult.hasValue()) {
       auto error = subscribeResult.error();
       std::cerr << "Subscribe failed before subscribe update: " << error.reasonPhrase
                 << std::endl;
-      co_return false;
+      return false;
     }
     auto subscriptionHandle = std::move(subscribeResult.value());
     
@@ -229,19 +231,19 @@ folly::coro::Task<bool> MoxygenInterface::subscribeUpdate(
     subscribeUpdate.forward = false;
 
     std::cout << "Sending subscribe update request" << std::endl;
-    auto result = co_await subscriptionHandle->subscribeUpdate(subscribeUpdate);
+    auto result = folly::coro::blockingWait(subscriptionHandle->subscribeUpdate(subscribeUpdate));
     std::cout << "Subscribe update sent successfully" << std::endl;
     if (!result.hasValue()) {
       auto error = result.error();
       std::cerr << "Subscribe update failed: " << error.reasonPhrase << std::endl;
-      co_return false;
+      return false;
     } else {
       std::cout << "Subscribe update succeeded" << std::endl;
-      co_return true;
+      return true;
     }
   } catch (const std::exception &ex) {
     std::cerr << "Exception in subscribe update: " << ex.what() << std::endl;
-    co_return false;
+    return false;
   }
 } 
 
@@ -259,47 +261,49 @@ MoxygenInterface::_doPublishNamespace(const std::string &trackNamespace) {
   co_return co_await relaySession_->announce(announce);
 }
 
-folly::coro::Task<bool>
+bool
 MoxygenInterface::publish_namespace(const std::string &trackNamespace) {
   try {
     if (!isConnected() || !relaySession_) {
       std::cerr << "No MoQ relay session available" << std::endl;
-      co_return false;
+      return false;
     }
 
-    auto announceResult = co_await _doPublishNamespace(trackNamespace);
+    auto announceResult = folly::coro::blockingWait(
+        _doPublishNamespace(trackNamespace));
 
     if (announceResult.hasValue()) {
       auto announceHandle = std::move(announceResult.value());
       std::cout << "Announce OK received for namespace: " << trackNamespace
                 << std::endl;
-      co_return true;
+      return true;
     } else {
       auto error = announceResult.error();
       std::cerr << "Announce failed: " << error.reasonPhrase << std::endl;
-      co_return false;
+      return false;
     }
   } catch (const std::exception &ex) {
     std::cerr << "Exception in publish_namespace: " << ex.what() << std::endl;
-    co_return false;
+    return false;
   }
 }
 
-folly::coro::Task<bool>
+bool
 MoxygenInterface::publish_namespace_done(const std::string &trackNamespace) {
   try {
     if (!isConnected() || !relaySession_) {
       std::cerr << "No MoQ relay session available" << std::endl;
-      co_return false;
+      return false;
     }
 
     // First announce
-    auto announceResult = co_await _doPublishNamespace(trackNamespace);
+    auto announceResult = folly::coro::blockingWait(
+        _doPublishNamespace(trackNamespace));
     if (!announceResult.hasValue()) {
       auto error = announceResult.error();
       std::cerr << "Announce failed before unannounce: " << error.reasonPhrase
                 << std::endl;
-      co_return false;
+      return false;
     }
 
     auto announceHandle_ = std::move(announceResult.value());
@@ -308,20 +312,20 @@ MoxygenInterface::publish_namespace_done(const std::string &trackNamespace) {
               << std::endl;
     // Send unannounce request
     announceHandle_->unannounce();
-    co_return true;
+    return true;
 
   } catch (const std::exception &ex) {
     std::cerr << "Exception in publish_namespace_done: " << ex.what() << std::endl;
-    co_return false;
+    return false;
   }
 }
 
-folly::coro::Task<bool>
+bool
 MoxygenInterface::subscribe_namespace(const std::string &trackNamespace) {
   try {
     if (!isConnected() || !relaySession_) {
       std::cerr << "No MoQ relay session available" << std::endl;
-      co_return false;
+      return false;
     }
 
     // Create subscribe announces request
@@ -330,63 +334,63 @@ MoxygenInterface::subscribe_namespace(const std::string &trackNamespace) {
     subscribeAnnounces.trackNamespacePrefix =
         moxygen::TrackNamespace(std::vector<std::string>{trackNamespace});
 
-    auto subscribeAnnounceResult_ =
-        co_await relaySession_->subscribeAnnounces(subscribeAnnounces);
+    auto subscribeAnnounceResult_ = folly::coro::blockingWait(
+        relaySession_->subscribeAnnounces(subscribeAnnounces));
 
     if (!subscribeAnnounceResult_.hasValue()) {
       auto error = subscribeAnnounceResult_.error();
       std::cerr << "Subscribe announces failed: " << error.reasonPhrase
                 << std::endl;
-      co_return false;
+      return false;
     } else {
       std::cout << "Subscribe announces succeeded for namespace: "
                 << trackNamespace << std::endl;
-      co_return true;
+      return true;
     }
 
   } catch (const std::exception &ex) {
     std::cerr << "Exception in subscribe_namespace: " << ex.what() << std::endl;
-    co_return false;
+    return false;
   }
 }
 
-folly::coro::Task<bool>
+bool
 MoxygenInterface::trackStatus(const std::string &trackNamespace,
                               const std::string &trackName) {
   try {
     if (!isConnected() || !relaySession_) {
       std::cerr << "No MoQ relay session available" << std::endl;
-      co_return false;
+      return false;
     }
 
-    auto result = co_await relaySession_->trackStatus(
+    auto result = folly::coro::blockingWait(relaySession_->trackStatus(
         moxygen::TrackStatus{.requestID = moxygen::RequestID{1},
                              .fullTrackName = moxygen::FullTrackName{
                                  .trackNamespace = moxygen::TrackNamespace(
                                      std::vector<std::string>{trackNamespace}),
-                                 .trackName = trackName}});
+                                 .trackName = trackName}}));
 
     if (result.hasValue()) {
       auto trackStatusOk = result.value();
       std::cout << "Track Status OK received for track: " << trackNamespace
                 << "/" << trackName << std::endl;
-      co_return true;
+      return true;
     } else {
       auto error = result.error();
       std::cerr << "Track Status failed: " << error.reasonPhrase << std::endl;
-      co_return false;
+      return false;
     }
   } catch (const std::exception &ex) {
     std::cerr << "Exception in trackStatus: " << ex.what() << std::endl;
-    co_return false;
+    return false;
   }
 }
 
-folly::coro::Task<bool> MoxygenInterface::goaway() {
+bool MoxygenInterface::goaway() {
   try {
     if (!isConnected() || !relaySession_) {
       std::cerr << "No MoQ relay session available" << std::endl;
-      co_return false;
+      return false;
     }
 
     std::cout << "Sending goaway after publish" << std::endl;
@@ -395,35 +399,35 @@ folly::coro::Task<bool> MoxygenInterface::goaway() {
     relaySession_->goaway(goaway_inp);
     std::cout << "Goaway sent successfully" << std::endl;
 
-    co_return true;
+    return true;
   } catch (const std::exception &ex) {
     std::cerr << "Exception in goaway: " << ex.what() << std::endl;
-    co_return false;
+    return false;
   }
 }
 
-folly::coro::Task<bool> MoxygenInterface::goaway_sequence() {
+bool MoxygenInterface::goaway_sequence() {
   try {
     if (!isConnected() || !relaySession_) {
       std::cerr << "No MoQ relay session available" << std::endl;
-      co_return false;
+      return false;
     }
 
     // First, publish with a dummy track name
     std::cout << "Publishing dummy track before goaway" << std::endl;
     auto subscriptionHandle_ = std::make_shared<MockSubscriptionHandle>();
-    bool publishSuccess =
-        co_await _doPublish("dummy_namespace", "dummy_track", subscriptionHandle_);
+    bool publishSuccess = folly::coro::blockingWait(
+        _doPublish("dummy_namespace", "dummy_track", subscriptionHandle_));
     if (!publishSuccess) {
       std::cerr << "Failed to publish dummy track" << std::endl;
-      co_return false;
+      return false;
     }
 
     // Then, send goaway
-    bool goawaySuccess = co_await goaway();
+    bool goawaySuccess = goaway();
     if (!goawaySuccess) {
       std::cerr << "Failed to send goaway" << std::endl;
-      co_return false;
+      return false;
     }
 
     std::cout << "Goaway sequence completed successfully" << std::endl;
@@ -432,31 +436,31 @@ folly::coro::Task<bool> MoxygenInterface::goaway_sequence() {
     // check if unsubscribe was called. Just return success if goaway sent.
     // Note that the protocol recommends waiting for a short period for
     // the unsubscribes.
-    co_return true;
+    return true;
 
   } catch (const std::exception &ex) {
     std::cerr << "Exception in goaway_sequence: " << ex.what() << std::endl;
-    co_return false;
+    return false;
   }
 }
 
-folly::coro::Task<bool>
+bool
 MoxygenInterface::setMaxConcurrentRequests(uint32_t maxConcurrentRequests) {
   try {
     if (!isConnected() || !relaySession_) {
       std::cerr << "No MoQ relay session available" << std::endl;
-      co_return false;
+      return false;
     }
 
     relaySession_->setMaxConcurrentRequests(maxConcurrentRequests);
     std::cout << "Set max concurrent requests to: " << maxConcurrentRequests
               << std::endl;
-    co_return true;
+    return true;
 
   } catch (const std::exception &ex) {
     std::cerr << "Exception in setMaxConcurrentRequests: " << ex.what()
               << std::endl;
-    co_return false;
+    return false;
   }
 }
 

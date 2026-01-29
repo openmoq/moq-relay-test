@@ -34,8 +34,7 @@ TestResult SubscribeNamespaceTest::execute() {
 
   // Send subscribe request
   log("Sending subscribe namespace request...");
-  bool subscribeResult = folly::coro::blockingWait(
-      subscriber->subscribe_namespace(trackNamespace_));
+  bool subscribeResult = subscriber->subscribe_namespace(trackNamespace_);
 
   // Verify subscribe succeeded
   assertTrue(subscribeResult, "Subscribe request should succeed");

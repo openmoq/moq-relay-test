@@ -37,8 +37,7 @@ TestResult PublishNamespaceDoneTest::execute() {
 
   // Send publish done request
   log("Sending publish done request...");
-  bool publishDoneResult =
-      folly::coro::blockingWait(publisher->publish_namespace_done(trackNamespace_));
+  bool publishDoneResult = publisher->publish_namespace_done(trackNamespace_);
 
   // Verify publish done succeeded
   assertTrue(publishDoneResult,

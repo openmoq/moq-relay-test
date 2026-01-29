@@ -31,9 +31,9 @@ TestResult BaseTest::run() {
     }
 
     if (result == TestResult::PASS) {
-      logAlways("✓ Test PASSED");
+      logAlways("Test PASSED");
     } else {
-      logAlways("✗ Test FAILED: " + lastError_);
+      logAlways("Test FAILED: " + lastError_);
     }
 
     return result;
@@ -51,7 +51,7 @@ TestResult BaseTest::run() {
     }
 
     setError(std::string("Exception: ") + ex.what());
-    logAlways("✗ Test ERROR: " + lastError_);
+    logAlways("Test ERROR: " + lastError_);
     return TestResult::ERROR;
   }
 }

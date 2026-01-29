@@ -64,8 +64,7 @@ TestResult TrackStatusTest::execute() {
   assertNotNull(subscriber.get(), "Subscriber interface should not be null");
   assertTrue(subscriber->isConnected(), "Subscriber should be connected");
 
-  bool trackStatusResult = folly::coro::blockingWait(
-      subscriber->trackStatus(trackNamespace_, trackName_));
+  bool trackStatusResult = subscriber->trackStatus(trackNamespace_, trackName_);
   assertTrue(trackStatusResult, "Track status request should succeed");
   log("Track status request successful");
 

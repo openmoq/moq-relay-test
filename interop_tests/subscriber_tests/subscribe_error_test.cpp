@@ -41,8 +41,7 @@ TestResult SubscribeErrorTest::execute() {
   assertNotNull(subscriber.get(), "Subscriber interface should not be null");
   assertTrue(subscriber->isConnected(), "Subscriber should be connected");
 
-  bool subscribeResult = folly::coro::blockingWait(
-      subscriber->subscribe(trackNamespace_, trackName_));
+  bool subscribeResult = subscriber->subscribe(trackNamespace_, trackName_);
 
   // Verify that the subscribe resulted in an error
   assertFalse(subscribeResult,

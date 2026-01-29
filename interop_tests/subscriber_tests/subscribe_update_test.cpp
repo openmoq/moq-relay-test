@@ -48,8 +48,7 @@ TestResult SubscribeUpdateTest::execute() {
   assertNotNull(publisher.get(), "Publisher interface should not be null");
   assertTrue(publisher->isConnected(), "Publisher should be connected");
 
-  bool publishResult = folly::coro::blockingWait(
-      publisher->publish(trackNamespace_, trackName_));
+  bool publishResult = publisher->publish(trackNamespace_, trackName_);
   assertTrue(publishResult, "Publish request should succeed");
   log("Publish successful");
 
@@ -59,7 +58,7 @@ TestResult SubscribeUpdateTest::execute() {
   // Send subscribe update
   log("Sending subscribe update");
   auto subscriber = fixture_->getSubscriber();
-  bool updateResult = folly::coro::blockingWait(subscriber->subscribeUpdate(trackNamespace_, trackName_));
+  bool updateResult = subscriber->subscribeUpdate(trackNamespace_, trackName_);
   assertTrue(updateResult, "Subscribe update request should succeed");
   log("Subscribe update successful");
 
