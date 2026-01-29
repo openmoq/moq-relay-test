@@ -1,6 +1,6 @@
 #include "base/base_test.h"
-#include "moxygen_adapter/moxygen_fixture.h"
-#include "moxygen_adapter/moxygen_interface.h"
+#include "base/fixture_interface.h"
+#include "base/moqt_interface.h"
 #include "test_registry.h"
 #include <folly/coro/BlockingWait.h>
 #include <memory>

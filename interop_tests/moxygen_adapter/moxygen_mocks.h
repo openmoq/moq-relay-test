@@ -8,10 +8,10 @@
 namespace interop_test {
 
 // Simple test subscription handle for publish/subscribe tests
-class TestSubscriptionHandle : public moxygen::SubscriptionHandle {
+class MockSubscriptionHandle : public moxygen::SubscriptionHandle {
 public:
-  TestSubscriptionHandle() = default;
-  explicit TestSubscriptionHandle(moxygen::SubscribeOk ok);
+  MockSubscriptionHandle() = default;
+  explicit MockSubscriptionHandle(moxygen::SubscribeOk ok);
 
   void unsubscribe() override;
   bool wasUnsubscribed() const { return unsubscribe_called_; }
@@ -23,10 +23,10 @@ private:
 };
 
 // Simple TrackConsumer implementation for testing
-class TestTrackConsumer : public moxygen::TrackConsumer {
+class MockTrackConsumer : public moxygen::TrackConsumer {
 public:
-  TestTrackConsumer() = default;
-  ~TestTrackConsumer() override = default;
+  MockTrackConsumer() = default;
+  ~MockTrackConsumer() override = default;
 
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
   setTrackAlias(moxygen::TrackAlias alias) override;

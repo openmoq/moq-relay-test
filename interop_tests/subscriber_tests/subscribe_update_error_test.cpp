@@ -1,6 +1,5 @@
 #include "base/base_test.h"
-#include "moxygen_adapter/moxygen_fixture.h"
-#include "moxygen_adapter/moxygen_interface.h"
+#include "base/moqt_interface.h"
 #include "test_registry.h"
 #include <folly/coro/BlockingWait.h>
 #include <memory>
@@ -34,8 +33,6 @@ protected:
 private:
   std::string trackNamespace_{"test"};
   std::string trackName_{"interop-track"};
-  std::shared_ptr<TestTrackConsumer> trackConsumer_ =
-      std::make_shared<TestTrackConsumer>();
 };
 
 // Auto-register this test
@@ -63,7 +60,7 @@ TestResult SubscribeUpdateErrorTest::execute() {
   // Send subscribe update
   log("Sending subscribe update");
   auto subscriber = fixture_->getSubscriber();
-  bool updateResult = folly::coro::blockingWait(subscriber->subscribeUpdate(trackNamespace_, trackName_, trackConsumer_, 260, moxygen::GroupOrder::NewestFirst));
+  bool updateResult = folly::coro::blockingWait(subscriber->subscribeUpdate(trackNamespace_, trackName_, 260, interop_test::GroupOrder::NewestFirst));
   assertFalse(updateResult, "Subscribe update request should fail with invalid priority");
 
   return TestResult::PASS;

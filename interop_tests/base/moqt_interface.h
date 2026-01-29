@@ -4,14 +4,9 @@
 #include <folly/coro/Task.h>
 #include <memory>
 #include <string>
-#include <moxygen/MoQFramer.h>
-#include <moxygen/MoQConsumers.h>
+#include "moqt_types.h"
 
 namespace interop_test {
-
-// Forward declaration
-class TestSubscriptionHandle;
-
 /**
  * MoQT Interface - Abstract base class for MoQ Transport implementations
  * 
@@ -42,33 +37,28 @@ public:
    * Sends a publish request to the MoQ relay
    * @param trackNamespace The track namespace
    * @param trackName The track name
-   * @param subscriptionHandle Optional subscription handle
    * @return Task that resolves to true on success
    */
   virtual folly::coro::Task<bool>
-  publish(const std::string &trackNamespace, const std::string &trackName,
-          std::shared_ptr<TestSubscriptionHandle> externalHandle = nullptr);
+  publish(const std::string &trackNamespace, const std::string &trackName);
 
   /**
    * Subscribes to a track on the MoQ relay
    * @param trackNamespace The track namespace
    * @param trackName The track name
-   * @param trackConsumer Callback to receive track data
    * @param priority Subscribe priority (default: 128)
    * @param groupOrder Group ordering preference (default: OldestFirst)
    * @return Task that resolves to true on success
    */
   virtual folly::coro::Task<bool>
   subscribe(const std::string &trackNamespace, const std::string &trackName,
-            std::shared_ptr<moxygen::TrackConsumer> trackConsumer,
             uint8_t priority = 128,
-            moxygen::GroupOrder groupOrder = moxygen::GroupOrder::OldestFirst);
+            GroupOrder groupOrder = GroupOrder::OldestFirst);
 
   /**
    * Updates an existing subscription
    * @param trackNamespace The track namespace
    * @param trackName The track name
-   * @param trackConsumer Callback to receive track data
    * @param priority Subscribe priority (default: 128)
    * @param groupOrder Group ordering preference (default: OldestFirst)
    * @param start Starting location for the update
@@ -78,10 +68,9 @@ public:
   virtual folly::coro::Task<bool>
   subscribeUpdate(const std::string &trackNamespace,
                   const std::string &trackName,
-                  std::shared_ptr<moxygen::TrackConsumer> trackConsumer,
                   uint8_t priority = 128,
-                  moxygen::GroupOrder groupOrder = moxygen::GroupOrder::OldestFirst,
-                  moxygen::AbsoluteLocation start = moxygen::AbsoluteLocation{0, 0},
+                  GroupOrder groupOrder = GroupOrder::OldestFirst,
+                  AbsoluteLocation start = AbsoluteLocation{0, 0},
                   uint8_t endGroup = 0);
 
   /**

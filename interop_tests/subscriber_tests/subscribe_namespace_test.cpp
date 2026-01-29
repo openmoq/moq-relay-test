@@ -1,6 +1,5 @@
 #include "base/base_test.h"
-#include "moxygen_adapter/moxygen_fixture.h"
-#include "moxygen_adapter/moxygen_interface.h"
+#include "base/moqt_interface.h"
 #include "test_registry.h"
 #include <folly/coro/BlockingWait.h>
 
@@ -32,10 +31,6 @@ TestResult SubscribeNamespaceTest::execute() {
   auto subscriber = fixture_->getSubscriber();
   assertNotNull(subscriber.get(), "Subscriber interface should not be null");
   assertTrue(subscriber->isConnected(), "Subscriber should be connected");
-
-  // Create subscription handle
-  auto trackConsumer = std::make_shared<TestTrackConsumer>();
-  assertNotNull(trackConsumer.get(), "Track consumer should not be null");
 
   // Send subscribe request
   log("Sending subscribe namespace request...");

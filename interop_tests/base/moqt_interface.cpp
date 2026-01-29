@@ -11,24 +11,21 @@ folly::coro::Task<bool> MoqtInterface::connect(
 }
 
 folly::coro::Task<bool> MoqtInterface::publish(
-    const std::string &trackNamespace, const std::string &trackName,
-    std::shared_ptr<TestSubscriptionHandle> externalHandle) {
+    const std::string &trackNamespace, const std::string &trackName) {
   std::cerr << "MoqtInterface::publish - Not implemented" << std::endl;
   co_return false;
 }
 
 folly::coro::Task<bool> MoqtInterface::subscribe(
     const std::string &trackNamespace, const std::string &trackName,
-    std::shared_ptr<moxygen::TrackConsumer> trackConsumer, uint8_t priority,
-    moxygen::GroupOrder groupOrder) {
+    uint8_t priority, GroupOrder groupOrder) {
   std::cerr << "MoqtInterface::subscribe - Not implemented" << std::endl;
   co_return false;
 }
 
 folly::coro::Task<bool> MoqtInterface::subscribeUpdate(
     const std::string &trackNamespace, const std::string &trackName,
-    std::shared_ptr<moxygen::TrackConsumer> trackConsumer, uint8_t priority,
-    moxygen::GroupOrder groupOrder, moxygen::AbsoluteLocation start,
+    uint8_t priority, GroupOrder groupOrder, AbsoluteLocation start,
     uint8_t endGroup) {
   std::cerr << "MoqtInterface::subscribeUpdate - Not implemented" << std::endl;
   co_return false;

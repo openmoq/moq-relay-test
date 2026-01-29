@@ -19,7 +19,7 @@
 namespace interop_test {
 
 // Forward declaration
-class TestSubscriptionHandle;
+class MockSubscriptionHandle;
 
 /**
  * MoxygenInterface - Moxygen implementation of MoqtInterface
@@ -53,8 +53,7 @@ public:
    * @return Task that resolves to true on success
    */
   folly::coro::Task<bool>
-  publish(const std::string &trackNamespace, const std::string &trackName,
-          std::shared_ptr<TestSubscriptionHandle> externalHandle = nullptr) override;
+  publish(const std::string &trackNamespace, const std::string &trackName) override;
 
   /**
    * Subscribes to a track on the MoQ relay
@@ -67,15 +66,13 @@ public:
    */
   folly::coro::Task<bool>
   subscribe(const std::string &trackNamespace, const std::string &trackName,
-            std::shared_ptr<moxygen::TrackConsumer> trackConsumer,
             uint8_t priority = 128,
-            moxygen::GroupOrder groupOrder = moxygen::GroupOrder::OldestFirst) override;
+            GroupOrder groupOrder = GroupOrder::OldestFirst) override;
 
   folly::coro::Task<bool> subscribeUpdate(const std::string &trackNamespace, const std::string &trackName,
-            std::shared_ptr<moxygen::TrackConsumer> trackConsumer,
             uint8_t priority = 128,
-            moxygen::GroupOrder groupOrder = moxygen::GroupOrder::OldestFirst,
-            moxygen::AbsoluteLocation start = moxygen::AbsoluteLocation{0,0},
+            GroupOrder groupOrder = GroupOrder::OldestFirst,
+            AbsoluteLocation start = AbsoluteLocation{0,0},
             uint8_t endGroup = 0) override;
 
   /**
@@ -132,12 +129,15 @@ private:
   folly::coro::Task<moxygen::MoQRelaySession::SubscribeResult> _doSubscribe(
       const std::string &trackNamespace,
       const std::string &trackName,
-      std::shared_ptr<moxygen::TrackConsumer> trackConsumer,
       uint8_t priority,
       moxygen::GroupOrder groupOrder);
 
   folly::coro::Task<folly::Expected<std::shared_ptr<moxygen::MoQRelaySession::AnnounceHandle>, moxygen::AnnounceError>>
   _doPublishNamespace(const std::string &trackNamespace);
+
+  folly::coro::Task<bool>
+  _doPublish(const std::string &trackNamespace, const std::string &trackName,
+          std::shared_ptr<MockSubscriptionHandle> externalHandle = nullptr);
 
   folly::EventBase *eventBase_;
   std::shared_ptr<moxygen::MoQClient> client_;

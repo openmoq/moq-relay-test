@@ -4,74 +4,74 @@
 
 namespace interop_test {
 
-// TestSubscriptionHandle implementations
-TestSubscriptionHandle::TestSubscriptionHandle(moxygen::SubscribeOk ok)
+// MockSubscriptionHandle implementations
+MockSubscriptionHandle::MockSubscriptionHandle(moxygen::SubscribeOk ok)
     : moxygen::SubscriptionHandle(std::move(ok)) {}
 
-void TestSubscriptionHandle::unsubscribe() {
-  std::cout << "TestSubscriptionHandle::unsubscribe() called" << std::endl;
+void MockSubscriptionHandle::unsubscribe() {
+  std::cout << "MockSubscriptionHandle::unsubscribe() called" << std::endl;
   unsubscribe_called_ = true;
 }
 
-folly::coro::Task<TestSubscriptionHandle::SubscribeUpdateResult>
-TestSubscriptionHandle::subscribeUpdate(moxygen::SubscribeUpdate subUpdate) {
+folly::coro::Task<MockSubscriptionHandle::SubscribeUpdateResult>
+MockSubscriptionHandle::subscribeUpdate(moxygen::SubscribeUpdate subUpdate) {
   std::cout
-      << "TestSubscriptionHandle::subscribeUpdate() called with request ID: "
+      << "MockSubscriptionHandle::subscribeUpdate() called with request ID: "
       << subUpdate.requestID << std::endl;
 
   // Return a successful result
   co_return moxygen::SubscribeUpdateOk{subUpdate.requestID};
 }
 
-// TestTrackConsumer implementations
+// MockTrackConsumer implementations
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
-TestTrackConsumer::setTrackAlias(moxygen::TrackAlias alias) {
-  std::cout << "TestTrackConsumer::setTrackAlias: " << alias.value << std::endl;
+MockTrackConsumer::setTrackAlias(moxygen::TrackAlias alias) {
+  std::cout << "MockTrackConsumer::setTrackAlias: " << alias.value << std::endl;
   return folly::unit;
 }
 
 folly::Expected<std::shared_ptr<moxygen::SubgroupConsumer>,
                 moxygen::MoQPublishError>
-TestTrackConsumer::beginSubgroup(uint64_t groupID, uint64_t subgroupID,
+MockTrackConsumer::beginSubgroup(uint64_t groupID, uint64_t subgroupID,
                                  moxygen::Priority priority) {
-  std::cout << "TestTrackConsumer::beginSubgroup - Group: " << groupID
+  std::cout << "MockTrackConsumer::beginSubgroup - Group: " << groupID
             << ", Subgroup: " << subgroupID << std::endl;
   return folly::makeUnexpected(moxygen::MoQPublishError(
       moxygen::MoQPublishError::API_ERROR, "not implemented"));
 }
 
 folly::Expected<folly::SemiFuture<folly::Unit>, moxygen::MoQPublishError>
-TestTrackConsumer::awaitStreamCredit() {
+MockTrackConsumer::awaitStreamCredit() {
   return folly::makeSemiFuture(folly::unit);
 }
 
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
-TestTrackConsumer::objectStream(const moxygen::ObjectHeader &header,
+MockTrackConsumer::objectStream(const moxygen::ObjectHeader &header,
                                 moxygen::Payload payload) {
-  std::cout << "TestTrackConsumer::objectStream - Group: " << header.group
+  std::cout << "MockTrackConsumer::objectStream - Group: " << header.group
             << ", Object: " << header.id << std::endl;
   return folly::unit;
 }
 
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
-TestTrackConsumer::datagram(const moxygen::ObjectHeader &header,
+MockTrackConsumer::datagram(const moxygen::ObjectHeader &header,
                             moxygen::Payload payload) {
-  std::cout << "TestTrackConsumer::datagram - Group: " << header.group
+  std::cout << "MockTrackConsumer::datagram - Group: " << header.group
             << ", Object: " << header.id << std::endl;
   return folly::unit;
 }
 
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
-TestTrackConsumer::groupNotExists(uint64_t groupID, uint64_t subgroup,
+MockTrackConsumer::groupNotExists(uint64_t groupID, uint64_t subgroup,
                                   moxygen::Priority pri) {
-  std::cout << "TestTrackConsumer::groupNotExists - Group: " << groupID
+  std::cout << "MockTrackConsumer::groupNotExists - Group: " << groupID
             << std::endl;
   return folly::unit;
 }
 
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
-TestTrackConsumer::subscribeDone(moxygen::SubscribeDone subDone) {
-  std::cout << "TestTrackConsumer::subscribeDone" << std::endl;
+MockTrackConsumer::subscribeDone(moxygen::SubscribeDone subDone) {
+  std::cout << "MockTrackConsumer::subscribeDone" << std::endl;
   return folly::unit;
 }
 

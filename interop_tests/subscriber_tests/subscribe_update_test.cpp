@@ -1,6 +1,5 @@
 #include "base/base_test.h"
-#include "moxygen_adapter/moxygen_fixture.h"
-#include "moxygen_adapter/moxygen_interface.h"
+#include "base/moqt_interface.h"
 #include "test_registry.h"
 #include <folly/coro/BlockingWait.h>
 #include <memory>
@@ -34,8 +33,6 @@ protected:
 private:
   std::string trackNamespace_{"test"};
   std::string trackName_{"interop-track"};
-  std::shared_ptr<TestTrackConsumer> trackConsumer_ =
-      std::make_shared<TestTrackConsumer>();
 };
 
 // Auto-register this test
@@ -62,7 +59,7 @@ TestResult SubscribeUpdateTest::execute() {
   // Send subscribe update
   log("Sending subscribe update");
   auto subscriber = fixture_->getSubscriber();
-  bool updateResult = folly::coro::blockingWait(subscriber->subscribeUpdate(trackNamespace_, trackName_, trackConsumer_));
+  bool updateResult = folly::coro::blockingWait(subscriber->subscribeUpdate(trackNamespace_, trackName_));
   assertTrue(updateResult, "Subscribe update request should succeed");
   log("Subscribe update successful");
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base/test_fixture_interface.h"
+#include "base/fixture_interface.h"
 #include <chrono>
 #include <folly/io/async/EventBase.h>
 #include <memory>

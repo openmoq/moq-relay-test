@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base/test_fixture_interface.h"
+#include "base/fixture_interface.h"
 #include "base/moqt_interface.h"
 #include "moxygen_adapter/moxygen_mocks.h"
 #include "moxygen_adapter/moxygen_interface.h"

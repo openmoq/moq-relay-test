@@ -13,7 +13,6 @@ namespace interop_test {
 
 // Forward declarations
 class MoqtInterface;
-class TestSubscriptionHandle;
 
 /**
  * Abstract interface for test fixtures
