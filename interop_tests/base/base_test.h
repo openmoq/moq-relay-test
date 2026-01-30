@@ -13,8 +13,36 @@ enum class TestResult { PASS, FAIL, TIMEOUT, ERROR };
 
 /**
  * Test categories for organizing and filtering tests
+ * Uses bit flags to allow tests to belong to multiple categories
  */
-enum class TestCategory { ALL };
+enum class TestCategory : uint32_t {
+  NONE = 0,
+  PUBLISHER = 1 << 0,        // 0x01
+  SUBSCRIBER = 1 << 1,       // 0x02
+  NAMESPACE = 1 << 2,        // 0x04
+  ERROR_HANDLING = 1 << 3,   // 0x08
+  UPDATE = 1 << 4,           // 0x10
+  CONNECTION = 1 << 5,       // 0x20
+  ALL = 0xFFFFFFFF
+};
+
+// Bit flag operators for TestCategory
+inline TestCategory operator|(TestCategory a, TestCategory b) {
+  return static_cast<TestCategory>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+}
+
+inline TestCategory operator&(TestCategory a, TestCategory b) {
+  return static_cast<TestCategory>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+}
+
+inline TestCategory operator|=(TestCategory& a, TestCategory b) {
+  a = a | b;
+  return a;
+}
+
+inline bool hasCategory(TestCategory flags, TestCategory category) {
+  return (static_cast<uint32_t>(flags) & static_cast<uint32_t>(category)) != 0;
+}
 
 /**
  * Test context provides shared configuration and resources for tests
@@ -67,9 +95,10 @@ public:
   virtual std::string getDescription() const = 0;
 
   /**
-   * Get test category for organization and filtering
+   * Get test categories for organization and filtering
+   * Returns a bitmask of TestCategory flags
    */
-  virtual TestCategory getCategory() const = 0;
+  virtual TestCategory getCategories() const = 0;
 
   /**
    * Get list of test names this test depends on (must run before this test)
@@ -182,13 +211,32 @@ inline void BaseTest::assertEqual<std::string>(const std::string &expected,
 /**
  * Helper to convert TestCategory to string
  */
-inline std::string testCategoryToString(TestCategory category) {
-  switch (category) {
-  case TestCategory::ALL:
+inline std::string testCategoryToString(TestCategory categories) {
+  if (categories == TestCategory::ALL) {
     return "All";
-  default:
+  }
+  if (categories == TestCategory::NONE) {
+    return "None";
+  }
+  
+  std::vector<std::string> names;
+  if (hasCategory(categories, TestCategory::PUBLISHER)) names.push_back("Publisher");
+  if (hasCategory(categories, TestCategory::SUBSCRIBER)) names.push_back("Subscriber");
+  if (hasCategory(categories, TestCategory::NAMESPACE)) names.push_back("Namespace");
+  if (hasCategory(categories, TestCategory::ERROR_HANDLING)) names.push_back("ErrorHandling");
+  if (hasCategory(categories, TestCategory::UPDATE)) names.push_back("Update");
+  if (hasCategory(categories, TestCategory::CONNECTION)) names.push_back("Connection");
+  
+  if (names.empty()) {
     return "Unknown";
   }
+  
+  std::string result;
+  for (size_t i = 0; i < names.size(); ++i) {
+    if (i > 0) result += ", ";
+    result += names[i];
+  }
+  return result;
 }
 
 } // namespace interop_test

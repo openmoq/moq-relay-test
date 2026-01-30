@@ -17,7 +17,7 @@ bool TestSuite::runAll(const TestSuiteConfig &config) {
   testContext.verbose = false;
 
   // Get tests from registry
-  auto tests = TestRegistry::instance().getTestsByCategory(config.category);
+  auto tests = TestRegistry::instance().getTestsByCategory(config.categoryFilter);
 
   if (tests.empty()) {
     std::cout << "No tests found in registry!\n";
@@ -88,6 +88,38 @@ bool TestSuite::runTest(const std::string &testName,
     recordResult(testName, TestResult::ERROR,
                  std::string("Exception: ") + e.what());
     return false;
+  }
+}
+
+void TestSuite::listTests(const TestSuiteConfig &config) const {
+  std::cout << "=== Available Tests ===\n\n";
+
+  // Get tests from registry
+  auto tests = TestRegistry::instance().getTestsByCategory(config.categoryFilter);
+
+  if (tests.empty()) {
+    std::cout << "No tests found in registry!\n";
+    return;
+  }
+
+  // Filter tests by name if specific tests are requested
+  if (!config.testNames.empty()) {
+    std::vector<TestInfo> filteredTests;
+    for (const auto &testInfo : tests) {
+      if (std::find(config.testNames.begin(), config.testNames.end(),
+                    testInfo.name) != config.testNames.end()) {
+        filteredTests.push_back(testInfo);
+      }
+    }
+    tests = filteredTests;
+  }
+
+  std::cout << "Total: " << tests.size() << " test(s)\n\n";
+
+  for (const auto &testInfo : tests) {
+    std::cout << "  " << testInfo.name << "\n";
+    std::cout << "    " << testInfo.description << "\n";
+    std::cout << "    Categories: " << testCategoryToString(testInfo.categories) << "\n\n";
   }
 }
 

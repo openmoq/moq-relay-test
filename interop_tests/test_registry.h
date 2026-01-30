@@ -21,7 +21,7 @@ using TestFactory =
 struct TestInfo {
   std::string name;
   std::string description;
-  TestCategory category;
+  TestCategory categories;  // Bitmask of TestCategory flags
   TestFactory factory;
 };
 
@@ -42,8 +42,8 @@ public:
   // Get all registered tests
   const std::map<std::string, TestInfo> &getAllTests() const;
 
-  // Get tests by category
-  std::vector<TestInfo> getTestsByCategory(TestCategory category) const;
+  // Get tests by category (supports filtering by multiple categories with bit flags)
+  std::vector<TestInfo> getTestsByCategory(TestCategory categoryFilter) const;
 
   // Create a test instance by name
   std::unique_ptr<BaseTest> createTest(const std::string &name,
@@ -69,7 +69,7 @@ public:
     TestInfo info;
     info.name = testInstance->getName();
     info.description = testInstance->getDescription();
-    info.category = testInstance->getCategory();
+    info.categories = testInstance->getCategories();  // Changed from getCategory
     info.factory = [](const TestContext &ctx) -> std::unique_ptr<BaseTest> {
       return std::make_unique<T>(ctx);
     };

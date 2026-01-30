@@ -19,7 +19,9 @@ public:
     return "Verifies that a client receives an error when subscribing to a "
            "non-existent track";
   }
-  TestCategory getCategory() const override { return TestCategory::ALL; }
+  TestCategory getCategories() const override { 
+    return TestCategory::SUBSCRIBER | TestCategory::ERROR_HANDLING; 
+  }
 
 protected:
   TestResult execute() override;

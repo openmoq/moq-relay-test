@@ -17,11 +17,14 @@ const std::map<std::string, TestInfo> &TestRegistry::getAllTests() const {
 }
 
 std::vector<TestInfo>
-TestRegistry::getTestsByCategory(TestCategory category) const {
+TestRegistry::getTestsByCategory(TestCategory categoryFilter) const {
   std::vector<TestInfo> result;
 
   for (const auto &[name, info] : tests_) {
-    if (category == TestCategory::ALL || info.category == category) {
+    // If categoryFilter is ALL, include all tests
+    // Otherwise, check if test has any of the requested categories
+    if (categoryFilter == TestCategory::ALL || 
+        hasCategory(info.categories, categoryFilter)) {
       result.push_back(info);
     }
   }

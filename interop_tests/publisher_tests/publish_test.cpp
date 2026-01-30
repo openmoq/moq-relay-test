@@ -23,7 +23,7 @@ public:
     return "Verifies that a client can successfully publish a track to the "
            "relay";
   }
-  TestCategory getCategory() const override { return TestCategory::ALL; }
+  TestCategory getCategories() const override { return TestCategory::PUBLISHER; }
 
 protected:
   TestResult execute() override;

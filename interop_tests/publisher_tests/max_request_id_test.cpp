@@ -23,7 +23,7 @@ public:
     return "Verifies that a client can successfully set the maximum "
            "concurrent requests on a MoQ session";
   }
-  TestCategory getCategory() const override { return TestCategory::ALL; }
+  TestCategory getCategories() const override { return TestCategory::PUBLISHER; }
 
 protected:
   TestResult execute() override;

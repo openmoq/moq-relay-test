@@ -25,7 +25,9 @@ public:
     return "Verifies that a client can send an erroneous subscribe update message after "
            "subscribing to a track";
   }
-  TestCategory getCategory() const override { return TestCategory::ALL; }
+  TestCategory getCategories() const override { 
+    return TestCategory::SUBSCRIBER | TestCategory::UPDATE | TestCategory::ERROR_HANDLING; 
+  }
 
 protected:
   TestResult execute() override;

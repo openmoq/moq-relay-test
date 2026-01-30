@@ -16,7 +16,9 @@ public:
     return "Verifies that a publisher can signal publish done for a namespace "
            "to the relay";
   }
-  TestCategory getCategory() const override { return TestCategory::ALL; }
+  TestCategory getCategories() const override { 
+    return TestCategory::PUBLISHER | TestCategory::NAMESPACE; 
+  }
 
 protected:
   TestResult execute() override;

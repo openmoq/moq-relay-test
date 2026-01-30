@@ -23,7 +23,9 @@ public:
     return "Verifies that a client can successfully send a goaway signal "
            "after publishing a track to the relay";
   }
-  TestCategory getCategory() const override { return TestCategory::ALL; }
+  TestCategory getCategories() const override { 
+    return TestCategory::PUBLISHER | TestCategory::CONNECTION; 
+  }
 
 protected:
   TestResult execute() override;

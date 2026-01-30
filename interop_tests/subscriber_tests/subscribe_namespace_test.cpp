@@ -13,7 +13,9 @@ public:
   std::string getDescription() const override {
     return "Verifies that a client can subscribe to a namespace via the relay";
   }
-  TestCategory getCategory() const override { return TestCategory::ALL; }
+  TestCategory getCategories() const override { 
+    return TestCategory::SUBSCRIBER | TestCategory::NAMESPACE; 
+  }
 
 protected:
   TestResult execute() override;

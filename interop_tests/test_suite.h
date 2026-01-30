@@ -11,7 +11,7 @@ namespace interop_test {
 
 struct TestSuiteConfig {
   std::string relayUrl{"https://localhost:4433/moq"};
-  TestCategory category{TestCategory::ALL}; // Run tests from specific category
+  TestCategory categoryFilter{TestCategory::ALL}; // Category filter (supports bit flags)
   std::vector<std::string>
       testNames; // Specific test names to run (empty = run all)
 };
@@ -26,6 +26,9 @@ public:
 
   // Run a specific test by name
   bool runTest(const std::string &testName, const TestContext &context);
+
+  // List all available tests
+  void listTests(const TestSuiteConfig &config) const;
 
   // Get summary of results
   void printSummary() const;

@@ -25,7 +25,7 @@ public:
     return "Verifies that a client can subscribe to a published track via the "
            "relay";
   }
-  TestCategory getCategory() const override { return TestCategory::ALL; }
+  TestCategory getCategories() const override { return TestCategory::SUBSCRIBER; }
 
 protected:
   TestResult execute() override;

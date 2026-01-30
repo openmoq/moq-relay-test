@@ -16,7 +16,9 @@ public:
   std::string getDescription() const override {
     return "Verifies that a publisher can announce a namespace to the relay";
   }
-  TestCategory getCategory() const override { return TestCategory::ALL; }
+  TestCategory getCategories() const override { 
+    return TestCategory::PUBLISHER | TestCategory::NAMESPACE; 
+  }
 
 protected:
   TestResult execute() override;

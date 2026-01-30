@@ -9,7 +9,7 @@ BaseTest::BaseTest(const TestContext &context)
 TestResult BaseTest::run() {
   logAlways("Running test: " + getName());
   log("Description: " + getDescription());
-  log("Category: " + testCategoryToString(getCategory()));
+  log("Categories: " + testCategoryToString(getCategories()));
 
   try {
     // Setup phase
