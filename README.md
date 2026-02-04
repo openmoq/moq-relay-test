@@ -1,2 +1,4 @@
-# moq-relay-test
-A tool for interop testing of MOQT relays
+# MoQ Relay Test
+Development and maintenance of the MOQT Relay Interop Testing Requirements document
+
+See relay-test-requirements.md
