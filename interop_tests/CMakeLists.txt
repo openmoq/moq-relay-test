@@ -171,6 +171,7 @@ add_executable(interop_tests
     subscriber_tests/subscribe_update_test.cpp
     subscriber_tests/subscribe_update_error_test.cpp
     subscriber_tests/track_status_test.cpp
+    subscriber_tests/fetch_test.cpp
     moxygen_adapter/moxygen_interface.cpp
     moxygen_adapter/moxygen_mocks.cpp
     moxygen_adapter/moxygen_fixture.cpp

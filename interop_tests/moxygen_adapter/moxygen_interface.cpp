@@ -8,7 +8,9 @@
 namespace interop_test {
 
 MoxygenInterface::MoxygenInterface(folly::EventBase *eventBase)
-    : eventBase_(eventBase) {
+    : eventBase_(eventBase),
+      publishHandler_(std::make_shared<MockPublisher>(eventBase)),
+      subscribeHandler_(std::make_shared<MockSubscriber>()) {
   if (!eventBase_) {
     throw std::invalid_argument("EventBase cannot be null");
   }
@@ -38,10 +40,12 @@ bool MoxygenInterface::connect(
         executor, std::move(parsedUrl),
         moxygen::MoQRelaySession::createRelaySessionFactory(), verifier);
 
-    // Set up MoQ session using blockingWait
+    // Set up MoQ session with handlers
+    // publishHandler: handles incoming SUBSCRIBE requests (after we ANNOUNCE/PUBLISH)
+    // subscribeHandler: handles incoming PUBLISH requests (not used right now)
     folly::coro::blockingWait(
         client_->setupMoQSession(connectTimeout, transactionTimeout,
-                                nullptr, nullptr, {}));
+                                publishHandler_, subscribeHandler_, {}));
 
     // Cast once and store for later use
     relaySession_ = std::dynamic_pointer_cast<moxygen::MoQRelaySession>(
@@ -65,7 +69,8 @@ bool MoxygenInterface::connect(
 
 folly::coro::Task<bool> MoxygenInterface::_doPublish(
     const std::string &trackNamespace, const std::string &trackName,
-    std::shared_ptr<MockSubscriptionHandle> externalHandle) {
+    std::shared_ptr<MockSubscriptionHandle> externalHandle,
+    bool forward) {
 
   try {
     if (!isConnected()) {
@@ -83,7 +88,7 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
                                .trackName = trackName};
     publishReq.requestID = moxygen::RequestID{0};
     publishReq.groupOrder = moxygen::GroupOrder::Default;
-    publishReq.forward = false;
+    publishReq.forward = forward;
 
     std::cout << "Sending publish request for track: " << trackNamespace << "/"
               << trackName << std::endl;
@@ -98,6 +103,9 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
     if (publishResult.hasValue()) {
       auto publishConsumerAndReply = std::move(publishResult.value());
 
+      // Store the track consumer for potential upstream data (relay scenario)
+      publishTrackConsumer_ = std::move(publishConsumerAndReply.consumer);
+
       // Handle the PUBLISH_OK or PUBLISH_ERROR
       auto replyTask = std::move(publishConsumerAndReply.reply);
       auto replyResult = co_await std::move(replyTask);
@@ -105,11 +113,26 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
       if (replyResult.hasValue()) {
         auto publishOk = replyResult.value();
         std::cout << "Publish OK received. Request ID: "
-                  << publishOk.requestID.value << std::endl;
+                  << publishOk.requestID.value 
+                  << ", forward: " << publishOk.forward << std::endl;
+        
+        // Check if relay accepted forward mode - only send data if both requested and accepted
+        if (forward && publishOk.forward && publishTrackConsumer_) {
+          std::cout << "Forward mode confirmed - starting to send data immediately" << std::endl;
+          
+          // Start sending data asynchronously using objectStream
+          sendMockDataViaObjectStream(publishTrackConsumer_, publishReq.requestID)
+              .scheduleOn(folly::getGlobalCPUExecutor())
+              .start();
+        } else if (!publishOk.forward) {
+          std::cout << "Relay mode - waiting for subscribe requests" << std::endl;
+        }
+        
         co_return true;
       } else {
         auto error = replyResult.error();
         std::cerr << "Publish failed: " << error.reasonPhrase << std::endl;
+        publishTrackConsumer_.reset();
         co_return false;
       }
     } else {
@@ -120,13 +143,14 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
     }
   } catch (const std::exception &ex) {
     std::cerr << "Exception in publish: " << ex.what() << std::endl;
+    publishTrackConsumer_.reset();
     co_return false;
   }
 }
 
 bool MoxygenInterface::publish(
-  const std::string &trackNamespace, const std::string &trackName) {
-  return folly::coro::blockingWait(_doPublish(trackNamespace, trackName, nullptr));
+  const std::string &trackNamespace, const std::string &trackName, bool forward) {
+  return folly::coro::blockingWait(_doPublish(trackNamespace, trackName, nullptr, forward));
 }
 
 
@@ -176,6 +200,12 @@ bool MoxygenInterface::subscribe(
       std::cout << "Subscribe OK received. Track alias: "
                 << subscriptionHandle->subscribeOk().trackAlias.value
                 << std::endl;
+      
+      // Wait for a few seconds to allow data to stream
+      std::cout << "Waiting 3 seconds for data to stream..." << std::endl;
+      std::this_thread::sleep_for(std::chrono::seconds(3));
+      std::cout << "Done waiting for streaming data" << std::endl;
+      
       return true;
     } else {
       auto error = subscribeResult.error();
@@ -246,6 +276,51 @@ bool MoxygenInterface::subscribeUpdate(
     return false;
   }
 } 
+
+
+bool MoxygenInterface::fetch(const std::string &trackNamespace, const std::string &trackName) {
+  try {
+    if (!isConnected() || !relaySession_) {
+      std::cerr << "No MoQ relay session available" << std::endl;
+      return false;
+    }
+
+    // Create fetch request
+    moxygen::Fetch fetchReq(
+        moxygen::RequestID{0},
+        moxygen::FullTrackName{.trackNamespace = moxygen::TrackNamespace(
+                                   std::vector<std::string>{trackNamespace}),
+                               .trackName = trackName},
+        moxygen::AbsoluteLocation{0, 0},  // start location
+        moxygen::AbsoluteLocation{},  // end location None
+        128,  // priority
+        moxygen::GroupOrder::OldestFirst,  // groupOrder
+        moxygen::TrackRequestParameters{}  // params
+    );
+    
+    std::cout << "Sending fetch request for track: " << trackNamespace << "/"
+              << trackName << std::endl;
+    
+    // Create and store fetch consumer to keep it alive for async callbacks
+    fetchConsumer_ = std::make_shared<MockFetchConsumer>();
+    
+    auto fetchResult = folly::coro::blockingWait(relaySession_->fetch(fetchReq, fetchConsumer_));
+    if (fetchResult.hasValue()) {
+      auto fetchHandle = fetchResult.value();
+      std::cout << "Fetch OK received." << std::endl;
+      return true;
+    } else {
+      auto error = fetchResult.error();
+      std::cerr << "Fetch failed: " << error.reasonPhrase << std::endl;
+      fetchConsumer_.reset();
+      return false;
+    }
+  } catch (const std::exception &ex) {
+    std::cerr << "Exception in fetch: " << ex.what() << std::endl;
+    fetchConsumer_.reset();
+    return false;
+  }
+}
 
 folly::coro::Task<folly::Expected<std::shared_ptr<moxygen::MoQRelaySession::AnnounceHandle>, moxygen::AnnounceError>>
 MoxygenInterface::_doPublishNamespace(const std::string &trackNamespace) {

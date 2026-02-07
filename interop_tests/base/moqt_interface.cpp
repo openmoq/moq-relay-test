@@ -11,7 +11,7 @@ bool MoqtInterface::connect(
 }
 
 bool MoqtInterface::publish(
-    const std::string &trackNamespace, const std::string &trackName) {
+    const std::string &trackNamespace, const std::string &trackName, bool forward) {
   std::cerr << "MoqtInterface::publish - Not implemented" << std::endl;
   return false;
 }
@@ -20,6 +20,12 @@ bool MoqtInterface::subscribe(
     const std::string &trackNamespace, const std::string &trackName,
     uint8_t priority, GroupOrder groupOrder) {
   std::cerr << "MoqtInterface::subscribe - Not implemented" << std::endl;
+  return false;
+}
+
+bool MoqtInterface::fetch(
+    const std::string &trackNamespace, const std::string &trackName) {
+  std::cerr << "MoqtInterface::fetch - Not implemented" << std::endl;
   return false;
 }
 

@@ -44,9 +44,9 @@ TestResult PublishTest::execute() {
   assertNotNull(publisher.get(), "Publisher interface should not be null");
   assertTrue(publisher->isConnected(), "Publisher should be connected");
 
-  // Send publish request
+  // Send publish request (forward=true to start sending data immediately)
   log("Sending publish request...");
-  bool publishResult = publisher->publish(trackNamespace_, trackName_);
+  bool publishResult = publisher->publish(trackNamespace_, trackName_, true);
 
   // Verify publish succeeded
   assertTrue(publishResult, "Publish request should succeed");

@@ -37,10 +37,11 @@ public:
    * Sends a publish request to the MoQ relay
    * @param trackNamespace The track namespace
    * @param trackName The track name
+   * @param forward Whether to forward the publish request (default: false)
    * @return true on success
    */
   virtual bool
-  publish(const std::string &trackNamespace, const std::string &trackName);
+  publish(const std::string &trackNamespace, const std::string &trackName, bool forward = false);
 
   /**
    * Subscribes to a track on the MoQ relay
@@ -78,6 +79,11 @@ public:
    * @param trackNamespace The namespace to announce (e.g., "video/conference")
    * @return true on success
    */
+
+  virtual bool
+  fetch(const std::string &trackNamespace, const std::string &trackName);
+
+
   virtual bool
   publish_namespace(const std::string &trackNamespace);
 

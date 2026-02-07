@@ -18,8 +18,11 @@
 
 namespace interop_test {
 
-// Forward declaration
+// Forward declarations
 class MockSubscriptionHandle;
+class MockFetchConsumer;
+class MockPublisher;
+class MockSubscriber;
 
 /**
  * MoxygenInterface - Moxygen implementation of MoqtInterface
@@ -49,11 +52,12 @@ public:
    * Sends a publish request to the MoQ relay
    * @param trackNamespace The track namespace
    * @param trackName The track name
+   * @param forward Whether to forward the publish request (default: false)
    * @param subscriptionHandle Optional subscription handle
    * @return true on success
    */
   bool
-  publish(const std::string &trackNamespace, const std::string &trackName) override;
+  publish(const std::string &trackNamespace, const std::string &trackName, bool forward = false) override;
 
   /**
    * Subscribes to a track on the MoQ relay
@@ -75,6 +79,7 @@ public:
             AbsoluteLocation start = AbsoluteLocation{0,0},
             uint8_t endGroup = 0) override;
 
+  bool fetch(const std::string &trackNamespace, const std::string &trackName) override;
   /**
    * Announces a namespace to the MoQ relay
    * @param trackNamespace The namespace to announce (e.g., "video/conference")
@@ -137,12 +142,19 @@ private:
 
   folly::coro::Task<bool>
   _doPublish(const std::string &trackNamespace, const std::string &trackName,
-          std::shared_ptr<MockSubscriptionHandle> externalHandle = nullptr);
+          std::shared_ptr<MockSubscriptionHandle> externalHandle = nullptr,
+          bool forward = false);
 
   folly::EventBase *eventBase_;
   std::shared_ptr<moxygen::MoQClient> client_;
   std::shared_ptr<moxygen::MoQRelaySession>
       relaySession_; // Cache the casted session
+  std::shared_ptr<moxygen::TrackConsumer> publishTrackConsumer_; // Store track consumer from publish
+  std::shared_ptr<MockFetchConsumer> fetchConsumer_; // Keep fetch consumer alive
+  
+  // Mock handlers for incoming requests from the relay
+  std::shared_ptr<MockPublisher> publishHandler_;   // Handles incoming SUBSCRIBE
+  std::shared_ptr<MockSubscriber> subscribeHandler_; // Handles incoming PUBLISH
 };
 
 } // namespace interop_test
