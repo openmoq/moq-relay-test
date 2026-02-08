@@ -31,7 +31,7 @@ class MockSubscriber;
 class MoxygenInterface : public MoqtInterface {
 public:
   explicit MoxygenInterface(folly::EventBase *eventBase);
-  ~MoxygenInterface() = default;
+  ~MoxygenInterface() override;
 
   /**
    * Establishes a MoQ session with the given URL
@@ -137,7 +137,7 @@ private:
       uint8_t priority,
       moxygen::GroupOrder groupOrder);
 
-  folly::coro::Task<folly::Expected<std::shared_ptr<moxygen::MoQRelaySession::AnnounceHandle>, moxygen::AnnounceError>>
+  folly::coro::Task<moxygen::Subscriber::PublishNamespaceResult>
   _doPublishNamespace(const std::string &trackNamespace);
 
   folly::coro::Task<bool>
@@ -146,11 +146,13 @@ private:
           bool forward = false);
 
   folly::EventBase *eventBase_;
+  std::shared_ptr<moxygen::MoQFollyExecutorImpl> executor_; // Keep executor alive
   std::shared_ptr<moxygen::MoQClient> client_;
   std::shared_ptr<moxygen::MoQRelaySession>
       relaySession_; // Cache the casted session
   std::shared_ptr<moxygen::TrackConsumer> publishTrackConsumer_; // Store track consumer from publish
   std::shared_ptr<MockFetchConsumer> fetchConsumer_; // Keep fetch consumer alive
+  std::shared_ptr<MockSubscriptionHandle> subscriptionHandle_; // Keep subscription handle alive for subscribe updates
   
   // Mock handlers for incoming requests from the relay
   std::shared_ptr<MockPublisher> publishHandler_;   // Handles incoming SUBSCRIBE

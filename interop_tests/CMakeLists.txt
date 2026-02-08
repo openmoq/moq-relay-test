@@ -246,6 +246,8 @@ target_link_libraries(interop_tests
     pthread
     dl
     c++abi
+    # Add fmt again at the end to resolve any circular dependencies
+    ${FMT_LIB}
 )
 
 set_target_properties(interop_tests PROPERTIES

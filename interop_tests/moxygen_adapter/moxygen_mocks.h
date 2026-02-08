@@ -38,14 +38,22 @@ class MockSubscriptionHandle : public moxygen::SubscriptionHandle {
 public:
   MockSubscriptionHandle() = default;
   explicit MockSubscriptionHandle(moxygen::SubscribeOk ok);
+  MockSubscriptionHandle(moxygen::SubscribeOk ok,
+                        std::shared_ptr<moxygen::TrackConsumer> consumer);
 
   void unsubscribe() override;
   bool wasUnsubscribed() const { return unsubscribe_called_; }
   folly::coro::Task<SubscribeUpdateResult>
   subscribeUpdate(moxygen::SubscribeUpdate subUpdate) override;
 
+  void setTrackConsumer(std::shared_ptr<moxygen::TrackConsumer> consumer) {
+    trackConsumer_ = std::move(consumer);
+  }
+
 private:
   bool unsubscribe_called_{false};
+  bool forward_data_sent_{false};
+  std::shared_ptr<moxygen::TrackConsumer> trackConsumer_;
 };
 
 // Simple test fetch handle for fetch tests
@@ -73,25 +81,24 @@ public:
   folly::Expected<std::shared_ptr<moxygen::SubgroupConsumer>,
                   moxygen::MoQPublishError>
   beginSubgroup(uint64_t groupID, uint64_t subgroupID,
-                moxygen::Priority priority) override;
+                moxygen::Priority priority,
+                bool containsLastInGroup = false) override;
 
   folly::Expected<folly::SemiFuture<folly::Unit>, moxygen::MoQPublishError>
   awaitStreamCredit() override;
 
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
   objectStream(const moxygen::ObjectHeader &header,
-               moxygen::Payload payload) override;
+               moxygen::Payload payload,
+               bool lastInGroup = false) override;
 
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
   datagram(const moxygen::ObjectHeader &header,
-           moxygen::Payload payload) override;
+           moxygen::Payload payload,
+           bool lastInGroup = false) override;
 
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
-  groupNotExists(uint64_t groupID, uint64_t subgroup,
-                 moxygen::Priority pri) override;
-
-  folly::Expected<folly::Unit, moxygen::MoQPublishError>
-  subscribeDone(moxygen::SubscribeDone subDone) override;
+  publishDone(moxygen::PublishDone pubDone) override;
 };
 
 // Simple FetchConsumer implementation for testing
@@ -103,37 +110,30 @@ public:
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
   object(uint64_t groupID, uint64_t subgroupID, uint64_t objectID,
          moxygen::Payload payload, moxygen::Extensions extensions,
-         bool finFetch) override;
-
-  folly::Expected<folly::Unit, moxygen::MoQPublishError>
-  objectNotExists(uint64_t groupID, uint64_t subgroupID, uint64_t objectID,
-                  bool finFetch) override;
-
-  folly::Expected<folly::Unit, moxygen::MoQPublishError>
-  groupNotExists(uint64_t groupID, uint64_t subgroupID, bool finFetch) override;
+         bool finFetch);
 
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
   beginObject(uint64_t groupID, uint64_t subgroupID, uint64_t objectID,
               uint64_t length, moxygen::Payload initialPayload,
-              moxygen::Extensions extensions) override;
+              moxygen::Extensions extensions);
 
   folly::Expected<moxygen::ObjectPublishStatus, moxygen::MoQPublishError>
-  objectPayload(moxygen::Payload payload, bool finSubgroup) override;
+  objectPayload(moxygen::Payload payload, bool finSubgroup);
 
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
   endOfGroup(uint64_t groupID, uint64_t subgroupID, uint64_t objectID,
-             bool finFetch) override;
+             bool finFetch);
 
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
   endOfTrackAndGroup(uint64_t groupID, uint64_t subgroupID,
-                     uint64_t objectID) override;
+                     uint64_t objectID);
 
-  folly::Expected<folly::Unit, moxygen::MoQPublishError> endOfFetch() override;
+  folly::Expected<folly::Unit, moxygen::MoQPublishError> endOfFetch();
 
-  void reset(moxygen::ResetStreamErrorCode error) override;
+  void reset(moxygen::ResetStreamErrorCode error);
 
   folly::Expected<folly::SemiFuture<uint64_t>, moxygen::MoQPublishError>
-  awaitReadyToConsume() override;
+  awaitReadyToConsume();
 };
 
 // Mock Publisher implementation to handle incoming SUBSCRIBE requests

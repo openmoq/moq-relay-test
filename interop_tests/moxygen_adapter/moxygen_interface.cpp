@@ -3,6 +3,7 @@
 #include "type_conversions.h"
 #include <folly/futures/Future.h>
 #include <folly/coro/BlockingWait.h>
+#include <folly/coro/Sleep.h>
 #include <iostream>
 
 namespace interop_test {
@@ -16,13 +17,24 @@ MoxygenInterface::MoxygenInterface(folly::EventBase *eventBase)
   }
 }
 
+MoxygenInterface::~MoxygenInterface() {
+  // Reset in proper order to ensure cleanup doesn't deadlock
+  relaySession_.reset();
+  client_.reset();
+
+  // Note: When using EventBaseThread, we don't need to manually drive the 
+  // EventBase as it's already being driven by a background thread.
+  // Just reset the executor.
+  executor_.reset();
+}
+
 bool MoxygenInterface::connect(
     const std::string &url, std::chrono::milliseconds connectTimeout,
     std::chrono::milliseconds transactionTimeout, bool useInsecureVerifier) {
-
+  
   try {
-    // Create executor from the provided event base
-    auto executor = std::make_shared<moxygen::MoQFollyExecutorImpl>(eventBase_);
+    // Create executor from the provided event base and store as member
+    executor_ = std::make_shared<moxygen::MoQFollyExecutorImpl>(eventBase_);
 
     proxygen::URL parsedUrl(url);
     if (!parsedUrl.isValid()) {
@@ -36,13 +48,17 @@ bool MoxygenInterface::connect(
     }
 
     // Create MoQ client with MoQRelaySession factory for announcement support
+    auto sessionFactory = moxygen::MoQRelaySession::createRelaySessionFactory();
     client_ = std::make_shared<moxygen::MoQClient>(
-        executor, std::move(parsedUrl),
-        moxygen::MoQRelaySession::createRelaySessionFactory(), verifier);
+        folly::getKeepAliveToken(executor_.get()),
+        std::move(parsedUrl),
+        std::move(sessionFactory),
+        verifier);
 
-    // Set up MoQ session with handlers
+    // Set up MoQ session synchronously using blockingWait
     // publishHandler: handles incoming SUBSCRIBE requests (after we ANNOUNCE/PUBLISH)
     // subscribeHandler: handles incoming PUBLISH requests (not used right now)
+    // Note: EventBase is driven by EventBaseThread, not by blockingWait
     folly::coro::blockingWait(
         client_->setupMoQSession(connectTimeout, transactionTimeout,
                                 publishHandler_, subscribeHandler_, {}));
@@ -72,11 +88,13 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
     std::shared_ptr<MockSubscriptionHandle> externalHandle,
     bool forward) {
 
+  // _doPublish coroutine started
   try {
     if (!isConnected()) {
       std::cerr << "No MoQ session available" << std::endl;
       co_return false;
     }
+    // Session is connected
 
     auto session = client_->moqSession_;
 
@@ -93,18 +111,21 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
     std::cout << "Sending publish request for track: " << trackNamespace << "/"
               << trackName << std::endl;
 
-    auto subscriptionHandle = externalHandle
+    subscriptionHandle_ = externalHandle
                                   ? externalHandle
                                   : std::make_shared<MockSubscriptionHandle>();
 
     // Send publish request via session's publish method
-    auto publishResult = session->publish(publishReq, subscriptionHandle);
+    auto publishResult = session->publish(publishReq, subscriptionHandle_);
 
     if (publishResult.hasValue()) {
       auto publishConsumerAndReply = std::move(publishResult.value());
 
-      // Store the track consumer for potential upstream data (relay scenario)
+      // Store the track consumer for streaming data later
       publishTrackConsumer_ = std::move(publishConsumerAndReply.consumer);
+
+      // Inject the track consumer into the subscription handle for subscribe updates
+      subscriptionHandle_->setTrackConsumer(publishTrackConsumer_); 
 
       // Handle the PUBLISH_OK or PUBLISH_ERROR
       auto replyTask = std::move(publishConsumerAndReply.reply);
@@ -120,14 +141,10 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
         if (forward && publishOk.forward && publishTrackConsumer_) {
           std::cout << "Forward mode confirmed - starting to send data immediately" << std::endl;
           
-          // Start sending data asynchronously using objectStream
-          sendMockDataViaObjectStream(publishTrackConsumer_, publishReq.requestID)
-              .scheduleOn(folly::getGlobalCPUExecutor())
-              .start();
-        } else if (!publishOk.forward) {
-          std::cout << "Relay mode - waiting for subscribe requests" << std::endl;
+          // Send data and await completion
+          co_await sendMockDataViaObjectStream(publishTrackConsumer_, publishReq.requestID);
+          std::cout << "Mock data transmission completed" << std::endl;
         }
-        
         co_return true;
       } else {
         auto error = replyResult.error();
@@ -150,7 +167,10 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
 
 bool MoxygenInterface::publish(
   const std::string &trackNamespace, const std::string &trackName, bool forward) {
-  return folly::coro::blockingWait(_doPublish(trackNamespace, trackName, nullptr, forward));
+  // Execute coroutine synchronously using blockingWait
+  // EventBase is driven by EventBaseThread, not by blockingWait
+  return folly::coro::blockingWait(
+      _doPublish(trackNamespace, trackName, nullptr, forward));
 }
 
 
@@ -173,7 +193,9 @@ folly::coro::Task<moxygen::MoQRelaySession::SubscribeResult> MoxygenInterface::_
       std::shared_ptr<MockTrackConsumer> trackConsumer = std::make_shared<MockTrackConsumer>();
 
     auto session = client_->moqSession_;
-    co_return co_await session->subscribe(subscribeReq, trackConsumer);
+    auto result = co_await session->subscribe(subscribeReq, trackConsumer);
+    
+    co_return result;
 }
 
 
@@ -200,20 +222,16 @@ bool MoxygenInterface::subscribe(
       std::cout << "Subscribe OK received. Track alias: "
                 << subscriptionHandle->subscribeOk().trackAlias.value
                 << std::endl;
-      
-      // Wait for a few seconds to allow data to stream
-      std::cout << "Waiting 3 seconds for data to stream..." << std::endl;
-      std::this_thread::sleep_for(std::chrono::seconds(3));
-      std::cout << "Done waiting for streaming data" << std::endl;
-      
       return true;
     } else {
       auto error = subscribeResult.error();
       std::cerr << "Subscribe failed: " << error.reasonPhrase << std::endl;
+      subscriptionHandle_.reset();
       return false;
     }
   } catch (const std::exception &ex) {
     std::cerr << "Exception in subscribe: " << ex.what() << std::endl;
+    subscriptionHandle_.reset();
     return false;
   }
 }
@@ -247,18 +265,26 @@ bool MoxygenInterface::subscribeUpdate(
     }
     auto subscriptionHandle = std::move(subscribeResult.value());
     
+    // If we have a publish track consumer, inject it so forward subscribeUpdate can use it
+    if (publishTrackConsumer_) {
+      auto mockHandle = std::dynamic_pointer_cast<MockSubscriptionHandle>(subscriptionHandle);
+      if (mockHandle) {
+        mockHandle->setTrackConsumer(publishTrackConsumer_);
+      }
+    }
+    
     // Convert interop_test types to moxygen types
     auto moxygenStart = toMoxygenAbsoluteLocation(start);
     
     // Send subscribe update request
     moxygen::SubscribeUpdate subscribeUpdate;
     subscribeUpdate.requestID = moxygen::RequestID{2};
-    subscribeUpdate.subscriptionRequestID = moxygen::RequestID{0};
+    subscribeUpdate.existingRequestID = moxygen::RequestID{0};
     // For draft < 15, start and endGroup are required
     subscribeUpdate.start = moxygenStart;
     subscribeUpdate.endGroup = endGroup;  
     subscribeUpdate.priority = priority;
-    subscribeUpdate.forward = false;
+    subscribeUpdate.forward = true;
 
     std::cout << "Sending subscribe update request" << std::endl;
     auto result = folly::coro::blockingWait(subscriptionHandle->subscribeUpdate(subscribeUpdate));
@@ -294,8 +320,7 @@ bool MoxygenInterface::fetch(const std::string &trackNamespace, const std::strin
         moxygen::AbsoluteLocation{0, 0},  // start location
         moxygen::AbsoluteLocation{},  // end location None
         128,  // priority
-        moxygen::GroupOrder::OldestFirst,  // groupOrder
-        moxygen::TrackRequestParameters{}  // params
+        moxygen::GroupOrder::OldestFirst  // groupOrder
     );
     
     std::cout << "Sending fetch request for track: " << trackNamespace << "/"
@@ -322,18 +347,18 @@ bool MoxygenInterface::fetch(const std::string &trackNamespace, const std::strin
   }
 }
 
-folly::coro::Task<folly::Expected<std::shared_ptr<moxygen::MoQRelaySession::AnnounceHandle>, moxygen::AnnounceError>>
+folly::coro::Task<moxygen::Subscriber::PublishNamespaceResult>
 MoxygenInterface::_doPublishNamespace(const std::string &trackNamespace) {
-  // Create announce request
-  moxygen::Announce announce;
-  announce.requestID = moxygen::RequestID{1};
-  announce.trackNamespace =
+  // Create publishNamespace request
+  moxygen::PublishNamespace publishNamespace;
+  publishNamespace.requestID = moxygen::RequestID{1};
+  publishNamespace.trackNamespace =
       moxygen::TrackNamespace(std::vector<std::string>{trackNamespace});
 
-  std::cout << "Sending announce request for namespace: " << trackNamespace
+  std::cout << "Sending publishNamespace request for namespace: " << trackNamespace
             << std::endl;
 
-  co_return co_await relaySession_->announce(announce);
+  co_return co_await relaySession_->publishNamespace(publishNamespace);
 }
 
 bool
@@ -344,17 +369,17 @@ MoxygenInterface::publish_namespace(const std::string &trackNamespace) {
       return false;
     }
 
-    auto announceResult = folly::coro::blockingWait(
-        _doPublishNamespace(trackNamespace));
+    auto publishNamespaceResult = folly::coro::blockingWait(
+      _doPublishNamespace(trackNamespace));
 
-    if (announceResult.hasValue()) {
-      auto announceHandle = std::move(announceResult.value());
-      std::cout << "Announce OK received for namespace: " << trackNamespace
+    if (publishNamespaceResult.hasValue()) {
+      auto publishNamespaceHandle = std::move(publishNamespaceResult.value());
+      std::cout << "PublishNamespace OK received for namespace: " << trackNamespace
                 << std::endl;
       return true;
     } else {
-      auto error = announceResult.error();
-      std::cerr << "Announce failed: " << error.reasonPhrase << std::endl;
+      auto error = publishNamespaceResult.error();
+      std::cerr << "PublishNamespace failed: " << error.reasonPhrase << std::endl;
       return false;
     }
   } catch (const std::exception &ex) {
@@ -371,22 +396,22 @@ MoxygenInterface::publish_namespace_done(const std::string &trackNamespace) {
       return false;
     }
 
-    // First announce
-    auto announceResult = folly::coro::blockingWait(
-        _doPublishNamespace(trackNamespace));
-    if (!announceResult.hasValue()) {
-      auto error = announceResult.error();
-      std::cerr << "Announce failed before unannounce: " << error.reasonPhrase
+    // First publishNamespace
+    auto publishNamespaceResult = folly::coro::blockingWait(
+      _doPublishNamespace(trackNamespace));
+    if (!publishNamespaceResult.hasValue()) {
+      auto error = publishNamespaceResult.error();
+      std::cerr << "PublishNamespace failed before publishNamespaceDone: " << error.reasonPhrase
                 << std::endl;
       return false;
     }
 
-    auto announceHandle_ = std::move(announceResult.value());
+    auto publishNamespaceHandle_ = std::move(publishNamespaceResult.value());
 
-    std::cout << "Sending unannounce request for namespace: " << trackNamespace
+    std::cout << "Sending publishNamespaceDone request for namespace: " << trackNamespace
               << std::endl;
-    // Send unannounce request
-    announceHandle_->unannounce();
+    // Send publishNamespaceDone request
+    publishNamespaceHandle_->publishNamespaceDone();
     return true;
 
   } catch (const std::exception &ex) {
@@ -403,22 +428,22 @@ MoxygenInterface::subscribe_namespace(const std::string &trackNamespace) {
       return false;
     }
 
-    // Create subscribe announces request
-    moxygen::SubscribeAnnounces subscribeAnnounces;
-    subscribeAnnounces.requestID = moxygen::RequestID{1};
-    subscribeAnnounces.trackNamespacePrefix =
+    // Create subscribe namespace request
+    moxygen::SubscribeNamespace subscribeNamespace;
+    subscribeNamespace.requestID = moxygen::RequestID{1};
+    subscribeNamespace.trackNamespacePrefix =
         moxygen::TrackNamespace(std::vector<std::string>{trackNamespace});
 
-    auto subscribeAnnounceResult_ = folly::coro::blockingWait(
-        relaySession_->subscribeAnnounces(subscribeAnnounces));
+    auto subscribeNamespaceResult_ = folly::coro::blockingWait(
+      relaySession_->subscribeNamespace(subscribeNamespace, nullptr));
 
-    if (!subscribeAnnounceResult_.hasValue()) {
-      auto error = subscribeAnnounceResult_.error();
-      std::cerr << "Subscribe announces failed: " << error.reasonPhrase
+    if (!subscribeNamespaceResult_.hasValue()) {
+      auto error = subscribeNamespaceResult_.error();
+      std::cerr << "Subscribe namespace failed: " << error.reasonPhrase
                 << std::endl;
       return false;
     } else {
-      std::cout << "Subscribe announces succeeded for namespace: "
+      std::cout << "Subscribe namespace succeeded for namespace: "
                 << trackNamespace << std::endl;
       return true;
     }
@@ -439,11 +464,11 @@ MoxygenInterface::trackStatus(const std::string &trackNamespace,
     }
 
     auto result = folly::coro::blockingWait(relaySession_->trackStatus(
-        moxygen::TrackStatus{.requestID = moxygen::RequestID{1},
-                             .fullTrackName = moxygen::FullTrackName{
-                                 .trackNamespace = moxygen::TrackNamespace(
-                                     std::vector<std::string>{trackNamespace}),
-                                 .trackName = trackName}}));
+      moxygen::TrackStatus{.requestID = moxygen::RequestID{1},
+                 .fullTrackName = moxygen::FullTrackName{
+                   .trackNamespace = moxygen::TrackNamespace(
+                     std::vector<std::string>{trackNamespace}),
+                   .trackName = trackName}}));
 
     if (result.hasValue()) {
       auto trackStatusOk = result.value();
@@ -492,7 +517,7 @@ bool MoxygenInterface::goaway_sequence() {
     std::cout << "Publishing dummy track before goaway" << std::endl;
     auto subscriptionHandle_ = std::make_shared<MockSubscriptionHandle>();
     bool publishSuccess = folly::coro::blockingWait(
-        _doPublish("dummy_namespace", "dummy_track", subscriptionHandle_));
+      _doPublish("dummy_namespace", "dummy_track", subscriptionHandle_));
     if (!publishSuccess) {
       std::cerr << "Failed to publish dummy track" << std::endl;
       return false;

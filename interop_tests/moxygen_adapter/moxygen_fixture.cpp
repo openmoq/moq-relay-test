@@ -159,6 +159,7 @@ void MoxygenTestFixture::cleanupInterface(std::shared_ptr<MoxygenInterface> &int
   }
 
   interface.reset();
+  std::cout << "  [Fixture] " << name << " interface reset" << std::endl;
 }
 
 } // namespace interop_test

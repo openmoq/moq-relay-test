@@ -70,11 +70,14 @@ TestCategory parseCategoryFilter(const std::string& categoryStr) {
 int main(int argc, char *argv[]) {
   folly::Init init(&argc, &argv);
 
-  // Create EventBaseThread
-  auto eventBaseThread = std::make_unique<folly::EventBaseThread>();
+  // Create EventBaseThread to continuously drive the event loop in background
+  // This allows MoQ connections to process incoming messages (e.g., SUBSCRIBE 
+  // requests from relay) even when test code is sleeping or doing other work
+  folly::EventBaseThread eventBaseThread;
+  auto eventBase = eventBaseThread.getEventBase();
 
   // Create test suite
-  auto testSuite = std::make_unique<TestSuite>(eventBaseThread->getEventBase());
+  auto testSuite = std::make_unique<TestSuite>(eventBase);
 
   // Configure test suite
   TestSuiteConfig config;
