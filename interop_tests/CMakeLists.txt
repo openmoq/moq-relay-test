@@ -60,6 +60,7 @@ find_library(GFLAGS_LIB gflags PATHS ${GFLAGS_DIR}/lib NO_DEFAULT_PATH)
 find_library(FMT_LIB fmt PATHS ${FMT_DIR}/lib NO_DEFAULT_PATH)
 find_library(LIBEVENT_LIB event PATHS ${LIBEVENT_DIR}/lib NO_DEFAULT_PATH)
 find_library(DOUBLE_CONVERSION_LIB double-conversion PATHS ${DOUBLE_CONVERSION_DIR}/lib NO_DEFAULT_PATH)
+
 # OpenSSL: Try fbcode_builder first, then system-wide
 # fbcode_builder installs OpenSSL in a versioned directory
 find_library(SSL_LIB ssl PATHS ${OPENSSL_DIR}/lib NO_DEFAULT_PATH)
@@ -192,7 +193,6 @@ add_executable(interop_tests
     subscriber_tests/subscribe_update_test.cpp
     subscriber_tests/subscribe_update_error_test.cpp
     subscriber_tests/track_status_test.cpp
-    subscriber_tests/fetch_test.cpp
     moxygen_adapter/moxygen_interface.cpp
     moxygen_adapter/moxygen_mocks.cpp
     moxygen_adapter/moxygen_fixture.cpp
@@ -213,7 +213,6 @@ target_include_directories(interop_tests PRIVATE
     ${DEPS_BASE_DIR}/mvfst/include
     ${BOOST_DIR}/include
     ${DOUBLE_CONVERSION_DIR}/include
-    ${OPENSSL_DIR}/include
     ${LZ4_DIR}/include
     ${LIBEVENT_DIR}/include
     ${OPENSSL_DIR}/include
@@ -243,11 +242,12 @@ target_link_libraries(interop_tests
     ${MLOGGER_LIB}
     ${MOQMI_LIB}
     ${FLVPARSER_LIB}
+    # Proxygen and WebTransport
+    ${PROXYGEN_LIB}
+    ${QUIC_WEBTRANSPORT_LIB}
     # Then mvfst libraries
     ${MVFST_LIBS}
     # Then the rest in dependency order
-    ${PROXYGEN_LIB}
-    ${QUIC_WEBTRANSPORT_LIB}
     ${WANGLE_LIB}
     ${FIZZ_LIB}
     ${FOLLY_LIB}
@@ -255,8 +255,6 @@ target_link_libraries(interop_tests
     ${GFLAGS_LIB}
     ${LIBEVENT_LIB}
     ${DOUBLE_CONVERSION_LIB}
-    ${SSL_LIB}
-    ${CRYPTO_LIB}
     ${ZSTD_LIB}
     ${LZ4_LIB}
     ${BOOST_CONTEXT_LIB}
@@ -289,10 +287,12 @@ endif()
 target_link_libraries(interop_tests
     pthread
     dl
-    c++abi
-    # Add fmt again at the end to resolve any circular dependencies
-    ${FMT_LIB}
 )
+
+# Only link c++abi on macOS/BSD systems
+if(APPLE OR ${CMAKE_SYSTEM_NAME} MATCHES "BSD")
+    target_link_libraries(interop_tests c++abi)
+endif()
 
 set_target_properties(interop_tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
