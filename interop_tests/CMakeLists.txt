@@ -60,10 +60,31 @@ find_library(GFLAGS_LIB gflags PATHS ${GFLAGS_DIR}/lib NO_DEFAULT_PATH)
 find_library(FMT_LIB fmt PATHS ${FMT_DIR}/lib NO_DEFAULT_PATH)
 find_library(LIBEVENT_LIB event PATHS ${LIBEVENT_DIR}/lib NO_DEFAULT_PATH)
 find_library(DOUBLE_CONVERSION_LIB double-conversion PATHS ${DOUBLE_CONVERSION_DIR}/lib NO_DEFAULT_PATH)
-
-# Find additional libraries that might be needed
+# OpenSSL: Try fbcode_builder first, then system-wide
+# fbcode_builder installs OpenSSL in a versioned directory
 find_library(SSL_LIB ssl PATHS ${OPENSSL_DIR}/lib NO_DEFAULT_PATH)
 find_library(CRYPTO_LIB crypto PATHS ${OPENSSL_DIR}/lib NO_DEFAULT_PATH)
+
+# If not found in fbcode_builder, try system-wide (Linux)
+if(NOT SSL_LIB)
+    find_library(SSL_LIB ssl)
+endif()
+if(NOT CRYPTO_LIB)
+    find_library(CRYPTO_LIB crypto)
+endif()
+
+if(SSL_LIB)
+    message(STATUS "Found SSL library: ${SSL_LIB}")
+endif()
+if(CRYPTO_LIB)
+    message(STATUS "Found Crypto library: ${CRYPTO_LIB}")
+endif()
+
+# Find libunwind (required by folly for stack traces)
+find_library(UNWIND_LIB unwind)
+if(UNWIND_LIB)
+    message(STATUS "Found libunwind: ${UNWIND_LIB}")
+endif()
 
 # Find lz4 library with more flexible pattern matching
 file(GLOB LZ4_DIRS "${DEPS_BASE_DIR}/lz4*")
@@ -195,6 +216,7 @@ target_include_directories(interop_tests PRIVATE
     ${OPENSSL_DIR}/include
     ${LZ4_DIR}/include
     ${LIBEVENT_DIR}/include
+    ${OPENSSL_DIR}/include
 )
 
 # Add zstd include directory dynamically
@@ -231,7 +253,6 @@ target_link_libraries(interop_tests
     ${FOLLY_LIB}
     ${GLOG_LIB}
     ${GFLAGS_LIB}
-    ${FMT_LIB}
     ${LIBEVENT_LIB}
     ${DOUBLE_CONVERSION_LIB}
     ${SSL_LIB}
@@ -241,8 +262,31 @@ target_link_libraries(interop_tests
     ${BOOST_CONTEXT_LIB}
     ${BOOST_SYSTEM_LIB}
     ${BOOST_THREAD_LIB}
-    ${SODIUM_LIB}
-    ${OQS_LIB}
+    # Link mvfst again to resolve circular dependencies
+    ${MVFST_LIBS}
+    # Link fmt AFTER mvfst since mvfst depends on it
+    ${FMT_LIB}
+)
+
+# Add optional libraries only if found
+if(SSL_LIB)
+    target_link_libraries(interop_tests ${SSL_LIB})
+endif()
+if(CRYPTO_LIB)
+    target_link_libraries(interop_tests ${CRYPTO_LIB})
+endif()
+if(SODIUM_LIB)
+    target_link_libraries(interop_tests ${SODIUM_LIB})
+endif()
+if(OQS_LIB)
+    target_link_libraries(interop_tests ${OQS_LIB})
+endif()
+if(UNWIND_LIB)
+    target_link_libraries(interop_tests ${UNWIND_LIB})
+endif()
+
+# Add system libraries
+target_link_libraries(interop_tests
     pthread
     dl
     c++abi
