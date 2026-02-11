@@ -142,8 +142,14 @@ void MoxygenTestFixture::cleanupInterface(std::shared_ptr<MoxygenInterface> &int
       eventBase_->runImmediatelyOrRunInEventBaseThreadAndWait([client,
                                                                &name]() {
         try {
-          client->moqSession_->close(moxygen::SessionCloseErrorCode::NO_ERROR);
-          std::cout << "  [Fixture] " << name << " session closed" << std::endl;
+          // Check again if session is still valid before closing
+          // to avoid use-after-free if goaway already closed it
+          if (client && client->moqSession_) {
+            client->moqSession_->close(moxygen::SessionCloseErrorCode::NO_ERROR);
+            std::cout << "  [Fixture] " << name << " session closed" << std::endl;
+          } else {
+            std::cout << "  [Fixture] " << name << " session already closed" << std::endl;
+          }
         } catch (const std::exception &ex) {
           std::cerr << "  [Fixture] Exception closing " << name
                     << " session: " << ex.what() << std::endl;

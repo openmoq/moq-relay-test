@@ -32,7 +32,7 @@ protected:
 };
 
 // Auto-register this test
-// REGISTER_TEST(GoawayTest);
+REGISTER_TEST(GoawayTest);
 
 TestResult GoawayTest::execute() {
   log("Executing goaway sequence");

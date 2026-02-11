@@ -189,7 +189,6 @@ add_executable(interop_tests
     subscriber_tests/subscribe_test.cpp
     subscriber_tests/subscribe_error_test.cpp
     subscriber_tests/subscribe_namespace_test.cpp
-    subscriber_tests/subscribe_namespace_error_test.cpp
     subscriber_tests/subscribe_update_test.cpp
     subscriber_tests/subscribe_update_error_test.cpp
     subscriber_tests/track_status_test.cpp

@@ -89,6 +89,7 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
     bool forward) {
 
   // _doPublish coroutine started
+  std::cout << "[_doPublish] Starting: namespace=" << trackNamespace << " trackName=" << trackName << " forward=" << forward << std::endl;
   try {
     if (!isConnected()) {
       std::cerr << "No MoQ session available" << std::endl;
@@ -108,16 +109,18 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
     publishReq.groupOrder = moxygen::GroupOrder::Default;
     publishReq.forward = forward;
 
-    std::cout << "Sending publish request for track: " << trackNamespace << "/"
-              << trackName << std::endl;
+    std::cout << "[_doPublish] Created publish request: requestID=" << publishReq.requestID.value 
+              << " forward=" << publishReq.forward << std::endl;
 
     subscriptionHandle_ = externalHandle
                                   ? externalHandle
                                   : std::make_shared<MockSubscriptionHandle>();
 
+    std::cout << "[_doPublish] Sending publish request..." << std::endl;
     // Send publish request via session's publish method
     auto publishResult = session->publish(publishReq, subscriptionHandle_);
 
+    std::cout << "[_doPublish] Got publish result, hasValue=" << publishResult.hasValue() << std::endl;
     if (publishResult.hasValue()) {
       auto publishConsumerAndReply = std::move(publishResult.value());
 
@@ -131,35 +134,40 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
       auto replyTask = std::move(publishConsumerAndReply.reply);
       auto replyResult = co_await std::move(replyTask);
 
-      if (replyResult.hasValue()) {
-        auto publishOk = replyResult.value();
-        std::cout << "Publish OK received. Request ID: "
-                  << publishOk.requestID.value 
-                  << ", forward: " << publishOk.forward << std::endl;
-        
-        // Check if relay accepted forward mode - only send data if both requested and accepted
-        if (forward && publishOk.forward && publishTrackConsumer_) {
-          std::cout << "Forward mode confirmed - starting to send data immediately" << std::endl;
-          
-          // Send data and await completion
-          co_await sendMockDataViaObjectStream(publishTrackConsumer_, publishReq.requestID);
-          std::cout << "Mock data transmission completed" << std::endl;
-        }
-        co_return true;
-      } else {
+      std::cout << "[_doPublish] Got reply result, hasValue=" << replyResult.hasValue() << std::endl;
+      if (!replyResult.hasValue()) {
         auto error = replyResult.error();
-        std::cerr << "Publish failed: " << error.reasonPhrase << std::endl;
+        std::cerr << "[_doPublish] ERROR: Reply has error: " << error.reasonPhrase << std::endl;
         publishTrackConsumer_.reset();
         co_return false;
       }
+      
+      // Log the raw reply result before parsing
+      std::cout << "[_doPublish] Reply result has value, size of PublishOk object: " << sizeof(replyResult.value()) << std::endl;
+      
+      auto publishOk = replyResult.value();
+        std::cout << "[_doPublish] PublishOK received: requestID=" << publishOk.requestID.value 
+                  << " forward=" << publishOk.forward 
+                  << " groupOrder=" << static_cast<int>(publishOk.groupOrder)
+                  << " locType=" << static_cast<int>(publishOk.locType) << std::endl;
+        
+        // Check if relay accepted forward mode - only send data if both requested and accepted
+        if (forward && publishOk.forward && publishTrackConsumer_) {
+          std::cout << "[_doPublish] Forward mode confirmed - starting to send data immediately" << std::endl;
+          
+          // Send data and await completion
+          co_await sendMockDataViaObjectStream(publishTrackConsumer_, publishReq.requestID);
+          std::cout << "[_doPublish] Mock data transmission completed" << std::endl;
+        }
+        co_return true;
     } else {
       auto error = publishResult.error();
-      std::cerr << "Publish request failed: " << error.reasonPhrase
+      std::cerr << "[_doPublish] ERROR: Publish request failed: " << error.reasonPhrase
                 << std::endl;
       co_return false;
     }
   } catch (const std::exception &ex) {
-    std::cerr << "Exception in publish: " << ex.what() << std::endl;
+    std::cerr << "[_doPublish] EXCEPTION: " << ex.what() << std::endl;
     publishTrackConsumer_.reset();
     co_return false;
   }
@@ -190,7 +198,7 @@ folly::coro::Task<moxygen::MoQRelaySession::SubscribeResult> MoxygenInterface::_
     std::cout << "Sending subscribe request for track: " << trackNamespace
               << "/" << trackName << std::endl;
 
-      std::shared_ptr<MockTrackConsumer> trackConsumer = std::make_shared<MockTrackConsumer>();
+    std::shared_ptr<MockTrackConsumer> trackConsumer = std::make_shared<MockTrackConsumer>();
 
     auto session = client_->moqSession_;
     auto result = co_await session->subscribe(subscribeReq, trackConsumer);
@@ -465,10 +473,16 @@ MoxygenInterface::trackStatus(const std::string &trackNamespace,
 
     auto result = folly::coro::blockingWait(relaySession_->trackStatus(
       moxygen::TrackStatus{.requestID = moxygen::RequestID{1},
-                 .fullTrackName = moxygen::FullTrackName{
-                   .trackNamespace = moxygen::TrackNamespace(
-                     std::vector<std::string>{trackNamespace}),
-                   .trackName = trackName}}));
+                           .fullTrackName = moxygen::FullTrackName{
+                               .trackNamespace = moxygen::TrackNamespace(
+                                   std::vector<std::string>{trackNamespace}),
+                               .trackName = trackName},
+                           .priority = 128,
+                           .groupOrder = moxygen::GroupOrder::Default,
+                           .forward = false,
+                           .locType = moxygen::LocationType::LargestGroup,
+                           .start = std::nullopt,
+                           .endGroup = 0}));
 
     if (result.hasValue()) {
       auto trackStatusOk = result.value();
@@ -529,6 +543,13 @@ bool MoxygenInterface::goaway_sequence() {
       std::cerr << "Failed to send goaway" << std::endl;
       return false;
     }
+
+    // Wait for the session to process the goaway and close gracefully.
+    // This prevents a race condition where the relay closes the session
+    // while we're still trying to clean it up in tearDown().
+    // Using blockingWait on a small sleep to allow event base processing.
+    std::cout << "Waiting for goaway to be processed..." << std::endl;
+    folly::coro::blockingWait(folly::coro::sleep(std::chrono::milliseconds(100)));
 
     std::cout << "Goaway sequence completed successfully" << std::endl;
 

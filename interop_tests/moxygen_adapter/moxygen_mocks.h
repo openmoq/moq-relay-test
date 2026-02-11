@@ -69,6 +69,40 @@ private:
   bool cancel_called_{false};
 };
 
+// Simple SubgroupConsumer implementation for testing
+class MockSubgroupConsumer : public moxygen::SubgroupConsumer {
+public:
+  MockSubgroupConsumer() = default;
+  ~MockSubgroupConsumer() override = default;
+
+  folly::Expected<folly::Unit, moxygen::MoQPublishError>
+  object(uint64_t objectID, moxygen::Payload payload,
+         moxygen::Extensions extensions = moxygen::noExtensions(),
+         bool finSubgroup = false) override;
+
+  folly::Expected<folly::Unit, moxygen::MoQPublishError>
+  beginObject(uint64_t objectID, uint64_t length,
+              moxygen::Payload initialPayload,
+              moxygen::Extensions extensions = moxygen::noExtensions()) override;
+
+  folly::Expected<moxygen::ObjectPublishStatus, moxygen::MoQPublishError>
+  objectPayload(moxygen::Payload payload, bool finSubgroup = false) override;
+
+  folly::Expected<folly::Unit, moxygen::MoQPublishError>
+  endOfGroup(uint64_t endOfGroupObjectID) override;
+
+  folly::Expected<folly::Unit, moxygen::MoQPublishError>
+  endOfTrackAndGroup(uint64_t endOfTrackObjectID) override;
+
+  folly::Expected<folly::Unit, moxygen::MoQPublishError>
+  endOfSubgroup() override;
+
+  void reset(moxygen::ResetStreamErrorCode error) override;
+
+  folly::Expected<folly::SemiFuture<uint64_t>, moxygen::MoQPublishError>
+  awaitReadyToConsume() override;
+};
+
 // Simple TrackConsumer implementation for testing
 class MockTrackConsumer : public moxygen::TrackConsumer {
 public:
@@ -99,6 +133,9 @@ public:
 
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
   publishDone(moxygen::PublishDone pubDone) override;
+
+private:
+  bool publishDone_received_{false};
 };
 
 // Simple FetchConsumer implementation for testing
@@ -142,6 +179,9 @@ public:
   explicit MockPublisher(folly::EventBase* eventBase = nullptr) 
       : eventBase_(eventBase) {}
   ~MockPublisher() override = default;
+
+  folly::coro::Task<TrackStatusResult> trackStatus(
+      const moxygen::TrackStatus trackStatus) override;
 
   folly::coro::Task<SubscribeResult> subscribe(
       moxygen::SubscribeRequest sub,

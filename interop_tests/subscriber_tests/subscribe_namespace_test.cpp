@@ -29,7 +29,11 @@ REGISTER_TEST(SubscribeNamespaceTest);
 TestResult SubscribeNamespaceTest::execute() {
   log("Subscribing to namespace: " + trackNamespace_);
 
-  // Get subscriber connection from fixture
+  /* subscribe_namespace doesn't throw an error if the namespace doesn't exist, 
+   it just returns success and then no updates will be received. 
+   So we can test the subscribe_namespace flow without needing to set up a publisher */
+   
+   // Get subscriber connection from fixture 
   auto subscriber = fixture_->getSubscriber();
   assertNotNull(subscriber.get(), "Subscriber interface should not be null");
   assertTrue(subscriber->isConnected(), "Subscriber should be connected");

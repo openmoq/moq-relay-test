@@ -37,26 +37,23 @@ private:
 };
 
 // Auto-register this test
-// This failing intermittently. Disabling until fixed.
-// REGISTER_TEST(TrackStatusTest);
+REGISTER_TEST(TrackStatusTest);
 
 TestResult TrackStatusTest::execute() {
   log("Testing track status for track: " + trackNamespace_ + "/" + trackName_);
 
   // First publish a track
-  //   log("Publishing track");
-  //   auto publisher = fixture_->getPublisher();
-  //   assertNotNull(publisher.get(), "Publisher interface should not be null");
-  //   assertTrue(publisher->isConnected(), "Publisher should be connected");
+  log("Publishing track");
+  auto publisher = fixture_->getPublisher();
+  assertNotNull(publisher.get(), "Publisher interface should not be null");
+  assertTrue(publisher->isConnected(), "Publisher should be connected");
 
-  //   auto subscriptionHandle = fixture_->createSubscriptionHandle();
-  //   bool publishResult = folly::coro::blockingWait(
-  //       publisher->publish(trackNamespace_, trackName_, subscriptionHandle));
-  //   assertTrue(publishResult, "Publish request should succeed");
-  //   log("Publish successful");
+  bool publishResult = publisher->publish(trackNamespace_, trackName_, true);
+  assertTrue(publishResult, "Publish request should succeed");
+  log("Publish successful");
 
   // Give the relay time to process the publish request
-  //   std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
   // Request track status from a different connection
   log("Requesting track status");
