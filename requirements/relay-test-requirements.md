@@ -105,6 +105,11 @@ The test cases are separated into two logical sets:
    - P3 - Stress Testing
    - P4 - Network Conditions
 
+**Note on Type Field:** The Type field indicates different aspects depending on test category:
+- **Conformance tests (C-XXX):** Indicates test focus area (version, auth, basic, forwarding, object-pattern, object-size, increment, extension, complex, error, resilience, multi-client, etc.)
+- **Performance tests (P-XXX):** Indicates measurement type (latency, throughput, scalability, etc.)
+
+
 ## 3.1 Conformance testing
 
 All tests can be run as Raw QUIC or WebTransport, the protocol should be selectable at start of test run.
@@ -120,7 +125,7 @@ graph LR
 
 | ID | Description | Type | Notes |
 | :---- | :---- | :---- | :---- |
-| C-101 | Supported version check | connect | Test tool probes to see which versions are supported |
+| C-101 | Supported version check | version | Test tool probes to see which versions are supported |
 
 ### 3.1.2 Authentication testing
 
@@ -182,7 +187,7 @@ We should consider UUID-namespaced test paths like test-{uuid}/moq-test-00 to av
 
 | ID | Description | Type | Notes |
 | :---- | :---- | :---- | :---- |
-| C-400 | Start server and announce namespace | publish | If fails do not run 3xx tests Check for existing moq-test-00 namespace? |
+| C-400 | Start server and announce namespace | setup | If fails do not run C-4xx tests. Check for existing moq-test-00 namespace? |
 
 #### 3.1.4.1 Basic Forwarding Preferences
 
@@ -190,11 +195,11 @@ Tests covering the four fundamental MoQ forwarding preferences and FETCH operati
 
 | ID | Description | Type | Notes |
 | :---- | :---- | :---- | :---- |
-| C-401 | Basic subscribe with default parameters | subscribe | Tests ONE\_SUBGROUP\_PER\_GROUP forwarding with 2 groups, 5 objects each |
-| C-402 | ONE\_SUBGROUP\_PER\_OBJECT forwarding | subscribe | Tests each object in separate subgroup with 2 groups, 5 objects each |
-| C-403 | TWO\_SUBGROUPS\_PER\_GROUP forwarding | subscribe | Tests two subgroups per group with 2 groups, 6 objects each |
-| C-404 | DATAGRAM forwarding with small objects | subscribe | Tests datagram mode with 100B object 0, 50B other objects |
-| C-405-408 | Fetch requests with different forwarding preferences | fetch | Tests FETCH mode with all 4 forwarding preference types |
+| C-401 | Basic subscribe with default parameters | forwarding | Tests ONE\_SUBGROUP\_PER\_GROUP forwarding with 2 groups, 5 objects each |
+| C-402 | ONE\_SUBGROUP\_PER\_OBJECT forwarding | forwarding | Tests each object in separate subgroup with 2 groups, 5 objects each |
+| C-403 | TWO\_SUBGROUPS\_PER\_GROUP forwarding | forwarding | Tests two subgroups per group with 2 groups, 6 objects each |
+| C-404 | DATAGRAM forwarding with small objects | forwarding | Tests datagram mode with 100B object 0, 50B other objects |
+| C-405-408 | Fetch requests with different forwarding preferences | forwarding | Tests FETCH mode with all 4 forwarding preference types |
 
 #### 3.1.4.2 Object and Group Patterns
 
@@ -202,14 +207,14 @@ Tests covering various group and object count combinations, including mid-stream
 
 | ID | Description | Type | Notes |
 | :---- | :---- | :---- | :---- |
-| C-409 | Single object per group | subscribe | Tests minimal case with 3 groups, 1 object each |
-| C-410 | Many objects per group | subscribe | Tests high object count with 1 group, 20 objects |
-| C-411 | Single group with multiple objects | subscribe | Tests single group delivery with 10 objects using ONE\_SUBGROUP\_PER\_OBJECT |
-| C-412 | Start from group 5 | subscribe | Tests mid-stream starting point from group 5 to 7 with 3 objects each |
-| C-413 | Start from object 3 | subscribe | Tests starting from specific object offset within group (8 objects total) |
-| C-414 | Partial group delivery | subscribe | Tests early termination: first 5 objects of 10 in group |
-| C-415 | FETCH specific range | fetch | Tests fetching specific range from group 2 object 1 to group 4, 5 objects per group |
-| C-416 | Single object fetch | fetch | Tests fetching single object (group 0, object 0) |
+| C-409 | Single object per group | object-pattern | Tests minimal case with 3 groups, 1 object each |
+| C-410 | Many objects per group | object-pattern | Tests high object count with 1 group, 20 objects |
+| C-411 | Single group with multiple objects | object-pattern | Tests single group delivery with 10 objects using ONE\_SUBGROUP\_PER\_OBJECT |
+| C-412 | Start from group 5 | object-pattern | Tests mid-stream starting point from group 5 to 7 with 3 objects each |
+| C-413 | Start from object 3 | object-pattern | Tests starting from specific object offset within group (8 objects total) |
+| C-414 | Partial group delivery | object-pattern | Tests early termination: first 5 objects of 10 in group |
+| C-415 | FETCH specific range | object-pattern | Tests fetching specific range from group 2 object 1 to group 4, 5 objects per group |
+| C-416 | Single object fetch | object-pattern | Tests fetching single object (group 0, object 0) |
 
 #### 3.1.4.3 Object Size Variations
 
@@ -217,14 +222,14 @@ Tests covering different object payload sizes from 1 byte to 10KB, including mix
 
 | ID | Description | Type | Notes |
 | :---- | :---- | :---- | :---- |
-| C-417 | Tiny objects | subscribe | Tests minimal payload with 10 byte objects, 2 groups, 5 objects each |
-| C-418 | Large object 0 | subscribe | Tests large first object (10KB) with smaller remaining objects (100B) |
-| C-419 | Large non-zero objects | subscribe | Tests large non-zero objects (5KB) with smaller object 0 (1KB) |
-| C-420 | All large objects | subscribe | Tests all objects at 8KB size, 1 group, 3 objects |
-| C-421 | Mixed sizes with TWO\_SUBGROUPS | subscribe | Tests TWO\_SUBGROUPS with 2KB object 0 and 512B other objects |
-| C-422 | Single byte objects | subscribe | Tests minimal size with 1 byte per object, 1 group, 5 objects |
-| C-423 | FETCH with large objects | fetch | Tests FETCH mode with 4KB objects |
-| C-424 | Very different object sizes | subscribe | Tests extreme size variation: 10KB object 0, 50B other objects |
+| C-417 | Tiny objects | object-size | Tests minimal payload with 10 byte objects, 2 groups, 5 objects each |
+| C-418 | Large object 0 | object-size | Tests large first object (10KB) with smaller remaining objects (100B) |
+| C-419 | Large non-zero objects | object-size | Tests large non-zero objects (5KB) with smaller object 0 (1KB) |
+| C-420 | All large objects | object-size | Tests all objects at 8KB size, 1 group, 3 objects |
+| C-421 | Mixed sizes with TWO\_SUBGROUPS | object-size | Tests TWO\_SUBGROUPS with 2KB object 0 and 512B other objects |
+| C-422 | Single byte objects | object-size | Tests minimal size with 1 byte per object, 1 group, 5 objects |
+| C-423 | FETCH with large objects | object-size | Tests FETCH mode with 4KB objects |
+| C-424 | Very different object sizes | object-size | Tests extreme size variation: 10KB object 0, 50B other objects |
 
 #### 3.1.4.4 Group and Object Increments
 
@@ -232,12 +237,12 @@ Tests covering non-sequential group and object numbering with various increment 
 
 | ID | Description | Type | Notes |
 | :---- | :---- | :---- | :---- |
-| C-425 | Group increment of 2 | subscribe | Tests non-sequential groups (0, 2, 4), 3 objects per group |
-| C-426 | Group increment of 5 | subscribe | Tests large group gaps (10, 15, 20), 3 objects per group |
-| C-427 | Object increment of 2 | subscribe | Tests even-numbered objects only (0, 2, 4, 6) in 8-object group |
-| C-428 | Object increment of 3 | subscribe | Tests every 3rd object (0, 3, 6) in 9-object group |
-| C-429 | Group and object increment of 2 | subscribe | Tests both group (0, 2, 4) and object (0, 2, 4) increments with TWO\_SUBGROUPS |
-| C-430 | Large increments | subscribe | Tests sparse delivery: group increment=10, object increment=5 |
+| C-425 | Group increment of 2 | increment | Tests non-sequential groups (0, 2, 4), 3 objects per group |
+| C-426 | Group increment of 5 | increment | Tests large group gaps (10, 15, 20), 3 objects per group |
+| C-427 | Object increment of 2 | increment | Tests even-numbered objects only (0, 2, 4, 6) in 8-object group |
+| C-428 | Object increment of 3 | increment | Tests every 3rd object (0, 3, 6) in 9-object group |
+| C-429 | Group and object increment of 2 | increment | Tests both group (0, 2, 4) and object (0, 2, 4) increments with TWO\_SUBGROUPS |
+| C-430 | Large increments | increment | Tests sparse delivery: group increment=10, object increment=5 |
 
 #### 3.1.4.5 Extensions and End-of-Group Markers
 
@@ -245,18 +250,18 @@ Tests covering MoQ extensions (integer and variable-length) and end-of-group mar
 
 | ID | Description | Type | Notes |
 | :---- | :---- | :---- | :---- |
-| C-431 | End of group markers \- basic | subscribe | Tests end-of-group signaling with basic forwarding, 2 groups, 5 objects each |
-| C-432 | End of group markers with ONE\_SUBGROUP\_PER\_OBJECT | subscribe | Tests end-of-group markers with per-object subgroups |
-| C-433 | End of group markers with TWO\_SUBGROUPS | subscribe | Tests end-of-group markers with two subgroups per group |
-| C-434 | FETCH with end of group markers | fetch | Tests FETCH mode respecting end-of-group markers |
-| C-435 | End of group markers with object increment | subscribe | Tests end-of-group markers with object increment=2 |
-| C-436 | End of group markers with single object | subscribe | Tests end-of-group markers with 1 object per group across 3 groups |
-| C-437 | Integer extension (ID=2) | subscribe | Tests custom integer extension field with extension ID 2 |
-| C-438 | Variable extension (ID=3) | subscribe | Tests custom variable-length extension field with extension ID 3 |
-| C-439 | Both integer and variable extensions | subscribe | Tests both extension types simultaneously |
-| C-440 | Extensions with higher IDs | subscribe | Tests extensions with non-default IDs (integer=5, variable=3) |
-| C-441 | FETCH with extensions | fetch | Tests FETCH mode with both extension types |
-| C-442 | Extensions with end of group markers | subscribe | Tests extensions combined with end-of-group markers |
+| C-431 | End of group markers \- basic | extension | Tests end-of-group signaling with basic forwarding, 2 groups, 5 objects each |
+| C-432 | End of group markers with ONE\_SUBGROUP\_PER\_OBJECT | extension | Tests end-of-group markers with per-object subgroups |
+| C-433 | End of group markers with TWO\_SUBGROUPS | extension | Tests end-of-group markers with two subgroups per group |
+| C-434 | FETCH with end of group markers | extension | Tests FETCH mode respecting end-of-group markers |
+| C-435 | End of group markers with object increment | extension | Tests end-of-group markers with object increment=2 |
+| C-436 | End of group markers with single object | extension | Tests end-of-group markers with 1 object per group across 3 groups |
+| C-437 | Integer extension (ID=2) | extension | Tests custom integer extension field with extension ID 2 |
+| C-438 | Variable extension (ID=3) | extension | Tests custom variable-length extension field with extension ID 3 |
+| C-439 | Both integer and variable extensions | extension | Tests both extension types simultaneously |
+| C-440 | Extensions with higher IDs | extension | Tests extensions with non-default IDs (integer=5, variable=3) |
+| C-441 | FETCH with extensions | extension | Tests FETCH mode with both extension types |
+| C-442 | Extensions with end of group markers | extension | Tests extensions combined with end-of-group markers |
 
 #### 3.1.4.6 Complex and Stress Scenarios
 
@@ -264,16 +269,18 @@ Tests covering timing variations, large-scale scenarios, and complex feature com
 
 | ID | Description | Type | Notes |
 | :---- | :---- | :---- | :---- |
-| C-443 | High frequency updates | subscribe | Tests rapid object delivery at 100ms intervals |
-| C-444 | Low frequency updates | subscribe | Tests slow object delivery at 2000ms intervals |
-| C-445 | Complex: All features combined | subscribe | Tests TWO\_SUBGROUPS, start offsets, increments, size variation, markers, and extensions together |
-| C-446 | Large scale: Many groups and objects | subscribe | Tests scale with 10 groups, 15 objects each, 100ms frequency |
-| C-447 | Sparse groups with large increment | subscribe | Tests very sparse delivery: groups 100, 200, 300, 400, 500 with 3 objects each |
-| C-448 | Delivery timeout | subscribe | Tests 500ms delivery timeout handling |
-| C-449 | Publisher delivery timeout | subscribe | Tests 1000ms publisher-side delivery timeout |
-| C-450 | Stress: DATAGRAM rapid delivery | subscribe | Tests high-frequency DATAGRAM delivery: 5 groups, 10 objects, 64B/32B sizes at 50ms intervals |
+| C-443 | High frequency updates | complex | Tests rapid object delivery at 100ms intervals |
+| C-444 | Low frequency updates | complex | Tests slow object delivery at 2000ms intervals |
+| C-445 | Complex: All features combined | complex | Tests TWO\_SUBGROUPS, start offsets, increments, size variation, markers, and extensions together |
+| C-446 | Large scale: Many groups and objects | complex | Tests scale with 10 groups, 15 objects each, 100ms frequency |
+| C-447 | Sparse groups with large increment | complex | Tests very sparse delivery: groups 100, 200, 300, 400, 500 with 3 objects each |
+| C-448 | Delivery timeout | complex | Tests 500ms delivery timeout handling |
+| C-449 | Publisher delivery timeout | complex | Tests 1000ms publisher-side delivery timeout |
+| C-450 | Stress: DATAGRAM rapid delivery | complex | Tests high-frequency DATAGRAM delivery: 5 groups, 10 objects, 64B/32B sizes at 50ms intervals |
 
 ### 3.1.5 Error Handling & Resilience
+
+This section is specifically aimed at providing bad inputs to the relay and ensuring it handles them gracefully.
 
 ```mermaid
 graph LR
@@ -297,6 +304,8 @@ graph LR
 
 ### 3.1.6 Multi-Client Scenarios
 
+This section is designed to verify multiple publisher / subscribers and ensure the relay is correctly handling multiple namespaces and tracks
+
 ```mermaid
 graph LR
     P1[Publisher 1] --> Relay[Relay under test]
@@ -318,7 +327,11 @@ graph LR
 
 ## 3.2 Performance testing
 
+Performance testing requires the test tool to be logically near the relay under test.
+
 ### 3.2.1 Throughput & Latency
+
+This section is concerned with measuring baseline performance statistics, as such the location of the test tool relative to the relay under test must be taken into consideration.
 
 ```mermaid
 graph LR
@@ -372,7 +385,7 @@ graph LR
 | P-304 | Resource exhaustion recovery | stress | Test recovery from resource limits |
 | P-305 | Graceful degradation under overload | stress | Verify controlled behavior when overloaded |
 
-### 3.2.4 P4 - Network Conditions
+### 3.2.4 Network Conditions
 
 Using a tool like tc, netem, etc introduce impaired network connection between the client and relay under test.
 
@@ -420,5 +433,5 @@ Fuzzing tests.
 
 [https://datatracker.ietf.org/doc/draft-ietf-moq-transport/](https://datatracker.ietf.org/doc/draft-ietf-moq-transport/) \- Media over QUIC Transport (MOQT)  
 [https://afrind.github.io/moq-test/draft-afrind-moq-test.html](https://afrind.github.io/moq-test/draft-afrind-moq-test.html) \- MoQ Test  
-[MoQ Interop](https://docs.google.com/spreadsheets/d/1uBVmUWdm-UZeEQQlPMBSNOa2L7xDwc7cTXwTXX8fSfw) \- Mike English doc \- ok to reference publicly (per Mike)
-
+[MoQ Interop](https://docs.google.com/spreadsheets/d/1uBVmUWdm-UZeEQQlPMBSNOa2L7xDwc7cTXwTXX8fSfw) \- Mike English doc  
+[moq-bench](https://github.com/Quicr/moq-bench) - quicr/moq-bench utility to evalute relay performance
