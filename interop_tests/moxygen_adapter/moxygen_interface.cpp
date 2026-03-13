@@ -4,7 +4,13 @@
 #include <folly/futures/Future.h>
 #include <folly/coro/BlockingWait.h>
 #include <folly/coro/Sleep.h>
+#include <folly/coro/Coroutine.h>
+#include <folly/Executor.h>
+#include <folly/executors/CPUThreadPoolExecutor.h>
 #include <iostream>
+#include <sstream>
+#include <thread>
+#include <chrono>
 
 namespace interop_test {
 
@@ -18,14 +24,39 @@ MoxygenInterface::MoxygenInterface(folly::EventBase *eventBase)
 }
 
 MoxygenInterface::~MoxygenInterface() {
-  // Reset in proper order to ensure cleanup doesn't deadlock
-  relaySession_.reset();
-  client_.reset();
-
-  // Note: When using EventBaseThread, we don't need to manually drive the 
-  // EventBase as it's already being driven by a background thread.
-  // Just reset the executor.
+  // Destroy QUIC-owned objects on the EventBase thread first, then drop the
+  // executor (which just wraps the EventBase pointer and is safe to reset from
+  // any thread).
+  // resetClientOnEventBase();
   executor_.reset();
+}
+
+void MoxygenInterface::resetClientOnEventBase() {
+  // Move shared_ptrs out so member variables are null immediately.
+  // The actual destruction is deferred to the EventBase thread so that any
+  // in-flight QUIC timer callbacks (e.g. idleTimeoutExpired -> onSessionEnd ->
+  // ~MoQSession) complete before the objects are freed.
+  auto client = std::move(client_);
+  auto relaySession = std::move(relaySession_);
+
+  if (!client) {
+    return;
+  }
+
+  if (eventBase_) {
+    // runImmediatelyOrRunInEventBaseThreadAndWait:
+    //   - If called from the EventBase thread: runs inline (no deadlock).
+    //   - If called from any other thread: posts to EventBase and blocks
+    //     until the lambda returns, guaranteeing the destructor finishes
+    //     before we proceed.
+    eventBase_->runImmediatelyOrRunInEventBaseThreadAndWait(
+        [c = std::move(client), rs = std::move(relaySession)]() mutable {
+          rs.reset();
+          c.reset();
+        });
+  }
+  // If eventBase_ is null, client/relaySession are destroyed here (stack
+  // unwind) which is fine since there is no EventBase driving QUIC timers.
 }
 
 bool MoxygenInterface::connect(
@@ -33,35 +64,54 @@ bool MoxygenInterface::connect(
     std::chrono::milliseconds transactionTimeout, bool useInsecureVerifier) {
   
   try {
+    std::cout << "[connect] Starting connection to " << url << std::endl;
+
+    // blockingWait must NOT be called from the EventBase thread as the
+    // coroutine relies on the EventBase to drive I/O completions.
+    if (eventBase_->isInEventBaseThread()) {
+      std::cerr << "[connect] FATAL: connect() called from EventBase thread - "
+                   "blockingWait would deadlock!" << std::endl;
+      return false;
+    }
+
     // Create executor from the provided event base and store as member
     executor_ = std::make_shared<moxygen::MoQFollyExecutorImpl>(eventBase_);
+    std::cout << "[connect] Created MoQFollyExecutorImpl" << std::endl;
 
     proxygen::URL parsedUrl(url);
     if (!parsedUrl.isValid()) {
       std::cerr << "Invalid URL: " << url << std::endl;
       return false;
     }
+    std::cout << "[connect] URL parsed successfully" << std::endl;
 
     std::shared_ptr<fizz::CertificateVerifier> verifier = nullptr;
     if (useInsecureVerifier) {
       verifier = std::make_shared<fizz::InsecureAcceptAnyCertificate>();
+      std::cout << "[connect] Using insecure certificate verifier" << std::endl;
     }
 
     // Create MoQ client with MoQRelaySession factory for announcement support
     auto sessionFactory = moxygen::MoQRelaySession::createRelaySessionFactory();
+    std::cout << "[connect] Created relay session factory" << std::endl;
+    
     client_ = std::make_shared<moxygen::MoQClient>(
-        folly::getKeepAliveToken(executor_.get()),
+        executor_,
         std::move(parsedUrl),
         std::move(sessionFactory),
         verifier);
+    std::cout << "[connect] Created MoQClient" << std::endl;
 
-    // Set up MoQ session synchronously using blockingWait
-    // publishHandler: handles incoming SUBSCRIBE requests (after we ANNOUNCE/PUBLISH)
-    // subscribeHandler: handles incoming PUBLISH requests (not used right now)
-    // Note: EventBase is driven by EventBaseThread, not by blockingWait
+    // Set up MoQ session synchronously using blockingWait.
+    // NOTE: setupMoQSession internally uses EventBaseThreadTimekeeper in
+    // QuicConnector::connectQuic, which shifts coroutine continuations onto
+    // the EventBase thread.  blockingWait() is baton-based so it can pick up
+    // completions posted from any thread — but we must NOT be on the EventBase
+    // thread ourselves (checked above).
     folly::coro::blockingWait(
         client_->setupMoQSession(connectTimeout, transactionTimeout,
-                                publishHandler_, subscribeHandler_, {}));
+                                publishHandler_, subscribeHandler_, {},
+                                {"moqt-16"}));
 
     // Cast once and store for later use
     relaySession_ = std::dynamic_pointer_cast<moxygen::MoQRelaySession>(
@@ -71,25 +121,22 @@ bool MoxygenInterface::connect(
       client_.reset();
       return false;
     }
+    std::cout << "[connect] Cast successful" << std::endl;
 
     std::cout << "MoQ session established successfully" << std::endl;
     return true;
 
   } catch (const std::exception &ex) {
     std::cerr << "Failed to establish MoQ session: " << ex.what() << std::endl;
-    relaySession_.reset();
-    client_.reset();
+    resetClientOnEventBase();
     return false;
   }
 }
-
 folly::coro::Task<bool> MoxygenInterface::_doPublish(
     const std::string &trackNamespace, const std::string &trackName,
     std::shared_ptr<MockSubscriptionHandle> externalHandle,
     bool forward) {
 
-  // _doPublish coroutine started
-  std::cout << "[_doPublish] Starting: namespace=" << trackNamespace << " trackName=" << trackName << " forward=" << forward << std::endl;
   try {
     if (!isConnected()) {
       std::cerr << "No MoQ session available" << std::endl;
@@ -109,60 +156,55 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
     publishReq.groupOrder = moxygen::GroupOrder::Default;
     publishReq.forward = forward;
 
-    std::cout << "[_doPublish] Created publish request: requestID=" << publishReq.requestID.value 
-              << " forward=" << publishReq.forward << std::endl;
-
     subscriptionHandle_ = externalHandle
                                   ? externalHandle
                                   : std::make_shared<MockSubscriptionHandle>();
-
-    std::cout << "[_doPublish] Sending publish request..." << std::endl;
+    
     // Send publish request via session's publish method
     auto publishResult = session->publish(publishReq, subscriptionHandle_);
 
-    std::cout << "[_doPublish] Got publish result, hasValue=" << publishResult.hasValue() << std::endl;
+    // Successful publish result with consumer and reply task
     if (publishResult.hasValue()) {
+      // Keep the entire result alive
       auto publishConsumerAndReply = std::move(publishResult.value());
 
       // Store the track consumer for streaming data later
       publishTrackConsumer_ = std::move(publishConsumerAndReply.consumer);
 
       // Inject the track consumer into the subscription handle for subscribe updates
-      subscriptionHandle_->setTrackConsumer(publishTrackConsumer_); 
+      if (subscriptionHandle_) {
+        subscriptionHandle_->setTrackConsumer(publishTrackConsumer_);
+      } else {
+        std::cerr << "ERROR: subscriptionHandle_ is null" << std::endl;
+        co_return false;
+      }
 
       // Handle the PUBLISH_OK or PUBLISH_ERROR
-      auto replyTask = std::move(publishConsumerAndReply.reply);
-      auto replyResult = co_await std::move(replyTask);
-
-      std::cout << "[_doPublish] Got reply result, hasValue=" << replyResult.hasValue() << std::endl;
-      if (!replyResult.hasValue()) {
-        auto error = replyResult.error();
-        std::cerr << "[_doPublish] ERROR: Reply has error: " << error.reasonPhrase << std::endl;
-        publishTrackConsumer_.reset();
+      // Use co_awaitTry to safely handle any exceptions thrown by the reply coroutine
+      auto replyResultTry = co_await folly::coro::co_awaitTry(std::move(publishConsumerAndReply.reply));
+      
+      if (replyResultTry.hasException()) {
+        std::cerr << "ERROR: Exception waiting for publish reply" << std::endl;
         co_return false;
       }
       
-      // Log the raw reply result before parsing
-      std::cout << "[_doPublish] Reply result has value, size of PublishOk object: " << sizeof(replyResult.value()) << std::endl;
+      // Check if reply had an error (PUBLISH_ERROR response from relay)
+      if (replyResultTry->hasError()) {
+        std::cerr << "ERROR: Publish was rejected by relay" << std::endl;
+        co_return false;
+      }
       
-      auto publishOk = replyResult.value();
-        std::cout << "[_doPublish] PublishOK received: requestID=" << publishOk.requestID.value 
-                  << " forward=" << publishOk.forward 
-                  << " groupOrder=" << static_cast<int>(publishOk.groupOrder)
-                  << " locType=" << static_cast<int>(publishOk.locType) << std::endl;
-        
-        // Check if relay accepted forward mode - only send data if both requested and accepted
-        if (forward && publishOk.forward && publishTrackConsumer_) {
-          std::cout << "[_doPublish] Forward mode confirmed - starting to send data immediately" << std::endl;
-          
-          // Send data and await completion
-          co_await sendMockDataViaObjectStream(publishTrackConsumer_, publishReq.requestID);
-          std::cout << "[_doPublish] Mock data transmission completed" << std::endl;
-        }
-        co_return true;
+      // At this point, we successfully got a PUBLISH_OK response
+      // Check if relay accepted forward mode - only send data if requested
+      if (forward && publishTrackConsumer_) {
+        // Send mock data to the relay
+        co_await sendMockDataViaObjectStream(publishTrackConsumer_, publishReq.requestID);
+      }
+      
+      co_return true;
     } else {
       auto error = publishResult.error();
-      std::cerr << "[_doPublish] ERROR: Publish request failed: " << error.reasonPhrase
+      std::cerr << "ERROR: Publish request failed: " << error.reasonPhrase
                 << std::endl;
       co_return false;
     }
@@ -175,10 +217,14 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
 
 bool MoxygenInterface::publish(
   const std::string &trackNamespace, const std::string &trackName, bool forward) {
-  // Execute coroutine synchronously using blockingWait
-  // EventBase is driven by EventBaseThread, not by blockingWait
+  // Schedule _doPublish on the EventBase thread so that session->publish()
+  // (which writes to the non-thread-safe controlWriteBuf_) runs safely.
+  // blockingWait is baton-based and can unblock when the coroutine posts its
+  // result from the EventBase thread.
   return folly::coro::blockingWait(
-      _doPublish(trackNamespace, trackName, nullptr, forward));
+      _doPublish(trackNamespace, trackName, nullptr, forward)
+          .scheduleOn(eventBase_)
+          .start());
 }
 
 
@@ -221,9 +267,12 @@ bool MoxygenInterface::subscribe(
     // Convert interop_test types to moxygen types
     auto moxygenGroupOrder = toMoxygenGroupOrder(groupOrder);
 
-    // Send subscribe request via session's subscribe method
+    // Schedule on EventBase thread: session->subscribe() writes to the
+    // non-thread-safe controlWriteBuf_ and must run on the EventBase thread.
     auto subscribeResult = folly::coro::blockingWait(
-        _doSubscribe(trackNamespace, trackName, priority, moxygenGroupOrder));
+        _doSubscribe(trackNamespace, trackName, priority, moxygenGroupOrder)
+            .scheduleOn(eventBase_)
+            .start());
 
     if (subscribeResult.hasValue()) {
       auto subscriptionHandle = std::move(subscribeResult.value());
@@ -258,12 +307,11 @@ bool MoxygenInterface::subscribeUpdate(
       return false;
     }
 
-    // Get a subscription handle and use that to send the subscribe update
-    auto subscribeResult = folly::coro::blockingWait(_doSubscribe(
-        trackNamespace,
-        trackName,
-        128,
-        moxygen::GroupOrder::OldestFirst));
+    // Schedule on EventBase thread: session->subscribe() writes to controlWriteBuf_.
+    auto subscribeResult = folly::coro::blockingWait(
+        _doSubscribe(trackNamespace, trackName, 128, moxygen::GroupOrder::OldestFirst)
+            .scheduleOn(eventBase_)
+            .start());
 
     if (!subscribeResult.hasValue()) {
       auto error = subscribeResult.error();
@@ -295,7 +343,10 @@ bool MoxygenInterface::subscribeUpdate(
     subscribeUpdate.forward = true;
 
     std::cout << "Sending subscribe update request" << std::endl;
-    auto result = folly::coro::blockingWait(subscriptionHandle->subscribeUpdate(subscribeUpdate));
+    auto result = folly::coro::blockingWait(
+        subscriptionHandle->requestUpdate(subscribeUpdate)
+            .scheduleOn(eventBase_)
+            .start());
     std::cout << "Subscribe update sent successfully" << std::endl;
     if (!result.hasValue()) {
       auto error = result.error();
@@ -337,7 +388,10 @@ bool MoxygenInterface::fetch(const std::string &trackNamespace, const std::strin
     // Create and store fetch consumer to keep it alive for async callbacks
     fetchConsumer_ = std::make_shared<MockFetchConsumer>();
     
-    auto fetchResult = folly::coro::blockingWait(relaySession_->fetch(fetchReq, fetchConsumer_));
+    auto fetchResult = folly::coro::blockingWait(
+        relaySession_->fetch(fetchReq, fetchConsumer_)
+            .scheduleOn(eventBase_)
+            .start());
     if (fetchResult.hasValue()) {
       auto fetchHandle = fetchResult.value();
       std::cout << "Fetch OK received." << std::endl;
@@ -378,7 +432,9 @@ MoxygenInterface::publish_namespace(const std::string &trackNamespace) {
     }
 
     auto publishNamespaceResult = folly::coro::blockingWait(
-      _doPublishNamespace(trackNamespace));
+      _doPublishNamespace(trackNamespace)
+          .scheduleOn(eventBase_)
+          .start());
 
     if (publishNamespaceResult.hasValue()) {
       auto publishNamespaceHandle = std::move(publishNamespaceResult.value());
@@ -406,7 +462,9 @@ MoxygenInterface::publish_namespace_done(const std::string &trackNamespace) {
 
     // First publishNamespace
     auto publishNamespaceResult = folly::coro::blockingWait(
-      _doPublishNamespace(trackNamespace));
+      _doPublishNamespace(trackNamespace)
+          .scheduleOn(eventBase_)
+          .start());
     if (!publishNamespaceResult.hasValue()) {
       auto error = publishNamespaceResult.error();
       std::cerr << "PublishNamespace failed before publishNamespaceDone: " << error.reasonPhrase
@@ -443,7 +501,9 @@ MoxygenInterface::subscribe_namespace(const std::string &trackNamespace) {
         moxygen::TrackNamespace(std::vector<std::string>{trackNamespace});
 
     auto subscribeNamespaceResult_ = folly::coro::blockingWait(
-      relaySession_->subscribeNamespace(subscribeNamespace, nullptr));
+      relaySession_->subscribeNamespace(subscribeNamespace, nullptr)
+          .scheduleOn(eventBase_)
+          .start());
 
     if (!subscribeNamespaceResult_.hasValue()) {
       auto error = subscribeNamespaceResult_.error();
@@ -471,8 +531,9 @@ MoxygenInterface::trackStatus(const std::string &trackNamespace,
       return false;
     }
 
-    auto result = folly::coro::blockingWait(relaySession_->trackStatus(
-      moxygen::TrackStatus{.requestID = moxygen::RequestID{1},
+    auto result = folly::coro::blockingWait(
+      relaySession_->trackStatus(
+        moxygen::TrackStatus{.requestID = moxygen::RequestID{1},
                            .fullTrackName = moxygen::FullTrackName{
                                .trackNamespace = moxygen::TrackNamespace(
                                    std::vector<std::string>{trackNamespace}),
@@ -482,7 +543,9 @@ MoxygenInterface::trackStatus(const std::string &trackNamespace,
                            .forward = false,
                            .locType = moxygen::LocationType::LargestGroup,
                            .start = std::nullopt,
-                           .endGroup = 0}));
+                           .endGroup = 0})
+          .scheduleOn(eventBase_)
+          .start());
 
     if (result.hasValue()) {
       auto trackStatusOk = result.value();
@@ -510,7 +573,11 @@ bool MoxygenInterface::goaway() {
     std::cout << "Sending goaway after publish" << std::endl;
     moxygen::Goaway goaway_inp{.newSessionUri = ""};
 
-    relaySession_->goaway(goaway_inp);
+    // goaway() writes to the non-thread-safe controlWriteBuf_;
+    // dispatch it to the EventBase thread.
+    auto session = relaySession_;
+    eventBase_->runInEventBaseThreadAndWait(
+        [session, goaway_inp]() mutable { session->goaway(goaway_inp); });
     std::cout << "Goaway sent successfully" << std::endl;
 
     return true;
@@ -531,7 +598,9 @@ bool MoxygenInterface::goaway_sequence() {
     std::cout << "Publishing dummy track before goaway" << std::endl;
     auto subscriptionHandle_ = std::make_shared<MockSubscriptionHandle>();
     bool publishSuccess = folly::coro::blockingWait(
-      _doPublish("dummy_namespace", "dummy_track", subscriptionHandle_));
+      _doPublish("dummy_namespace", "dummy_track", subscriptionHandle_)
+          .scheduleOn(eventBase_)
+          .start());
     if (!publishSuccess) {
       std::cerr << "Failed to publish dummy track" << std::endl;
       return false;
@@ -573,7 +642,13 @@ MoxygenInterface::setMaxConcurrentRequests(uint32_t maxConcurrentRequests) {
       return false;
     }
 
-    relaySession_->setMaxConcurrentRequests(maxConcurrentRequests);
+    // setMaxConcurrentRequests() calls sendMaxRequestID which writes to
+    // controlWriteBuf_; dispatch to EventBase thread.
+    auto session = relaySession_;
+    eventBase_->runInEventBaseThreadAndWait(
+        [session, maxConcurrentRequests]() {
+          session->setMaxConcurrentRequests(maxConcurrentRequests);
+        });
     std::cout << "Set max concurrent requests to: " << maxConcurrentRequests
               << std::endl;
     return true;

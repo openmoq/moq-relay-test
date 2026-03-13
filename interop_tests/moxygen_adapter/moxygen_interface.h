@@ -145,6 +145,18 @@ private:
           std::shared_ptr<MockSubscriptionHandle> externalHandle = nullptr,
           bool forward = false);
 
+  /**
+   * Safely destroy client_ and relaySession_ on the EventBase thread.
+   *
+   * QUIC transport objects and their timers live on the EventBase thread.
+   * Destroying them from any other thread races with pending callbacks
+   * (e.g. idleTimeoutExpired -> onSessionEnd -> ~MoQSession).
+   * This helper transfers ownership of the shared_ptrs into a lambda that
+   * runs on the EventBase thread, so all in-flight callbacks complete before
+   * the destructors run.
+   */
+  void resetClientOnEventBase();
+
   folly::EventBase *eventBase_;
   std::shared_ptr<moxygen::MoQFollyExecutorImpl> executor_; // Keep executor alive
   std::shared_ptr<moxygen::MoQClient> client_;

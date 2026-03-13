@@ -138,7 +138,6 @@ void MoxygenTestFixture::cleanupInterface(std::shared_ptr<MoxygenInterface> &int
     auto client = interface->getClient();
     if (eventBase_ && client && client->moqSession_) {
       std::cout << "  [Fixture] Closing " << name << " session..." << std::endl;
-
       eventBase_->runImmediatelyOrRunInEventBaseThreadAndWait([client,
                                                                &name]() {
         try {
@@ -155,7 +154,6 @@ void MoxygenTestFixture::cleanupInterface(std::shared_ptr<MoxygenInterface> &int
                     << " session: " << ex.what() << std::endl;
         }
       });
-
       // Give time for graceful shutdown
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }

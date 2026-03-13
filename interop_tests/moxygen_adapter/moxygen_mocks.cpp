@@ -23,27 +23,27 @@ void MockSubscriptionHandle::unsubscribe() {
   unsubscribe_called_ = true;
 }
 
-folly::coro::Task<MockSubscriptionHandle::SubscribeUpdateResult>
-MockSubscriptionHandle::subscribeUpdate(moxygen::SubscribeUpdate subUpdate) {
+folly::coro::Task<moxygen::SubscriptionHandle::RequestUpdateResult>
+MockSubscriptionHandle::requestUpdate(moxygen::RequestUpdate reqUpdate) {
   std::cout
-      << "MockSubscriptionHandle::subscribeUpdate() called with request ID: "
-      << subUpdate.requestID
-      << ", forward: " << (subUpdate.forward ? "true" : "false")
+      << "MockSubscriptionHandle::requestUpdate() called with request ID: "
+      << reqUpdate.requestID
+      << ", forward: " << (reqUpdate.forward ? "true" : "false")
       << std::endl;
 
   // If forward subscription and we haven't sent data yet, start sending mock data
-  if (subUpdate.forward && !forward_data_sent_ && trackConsumer_) {
+  if (reqUpdate.forward && !forward_data_sent_ && trackConsumer_) {
     std::cout << "MockSubscriptionHandle: Forward subscription detected, sending mock data"
               << std::endl;
     forward_data_sent_ = true;  // Mark as sent to prevent duplicate sends
     folly::coro::co_withExecutor(
         folly::getGlobalCPUExecutor(),
-        sendMockDataViaTrackConsumer(trackConsumer_, subUpdate.requestID))
+        sendMockDataViaTrackConsumer(trackConsumer_, reqUpdate.requestID))
         .start();
   }
 
   // Return a successful result
-  co_return moxygen::SubscribeUpdateOk{subUpdate.requestID};
+  co_return moxygen::RequestOk{reqUpdate.requestID};
 }
 
 // ============================================================================
@@ -55,6 +55,13 @@ MockFetchHandle::MockFetchHandle(moxygen::FetchOk ok)
 void MockFetchHandle::fetchCancel() {
   std::cout << "MockFetchHandle::fetchCancel() called" << std::endl;
   cancel_called_ = true;
+}
+
+folly::coro::Task<moxygen::Publisher::FetchHandle::RequestUpdateResult>
+MockFetchHandle::requestUpdate(moxygen::RequestUpdate reqUpdate) {
+  std::cout << "MockFetchHandle::requestUpdate() called with request ID: "
+            << reqUpdate.requestID << std::endl;
+  co_return moxygen::RequestOk{reqUpdate.requestID};
 }
 
 // ============================================================================
@@ -211,7 +218,8 @@ MockSubgroupConsumer::awaitReadyToConsume() {
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
 MockFetchConsumer::object(uint64_t groupID, uint64_t subgroupID,
                           uint64_t objectID, moxygen::Payload payload,
-                          moxygen::Extensions extensions, bool finFetch) {
+                          moxygen::Extensions extensions, bool finFetch,
+                          bool forwardingPreferenceIsDatagram) {
   std::cout << "MockFetchConsumer::object - Group: " << groupID
             << ", Subgroup: " << subgroupID << ", Object: " << objectID
             << ", finFetch: " << finFetch << std::endl;
@@ -381,7 +389,7 @@ MockPublisher::trackStatus(const moxygen::TrackStatus trackStatus) {
   statusOk.requestID = trackStatus.requestID;
   statusOk.trackAlias = moxygen::TrackAlias{trackStatus.requestID.value};
   statusOk.expires = std::chrono::milliseconds(0);
-  statusOk.groupOrder = moxygen::GroupOrder::Default;
+  statusOk.groupOrder = moxygen::GroupOrder::OldestFirst;
   statusOk.largest = moxygen::AbsoluteLocation{0, 0};
   statusOk.fullTrackName = trackStatus.fullTrackName;
   statusOk.statusCode = moxygen::TrackStatusCode::IN_PROGRESS;

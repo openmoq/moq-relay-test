@@ -43,8 +43,8 @@ public:
 
   void unsubscribe() override;
   bool wasUnsubscribed() const { return unsubscribe_called_; }
-  folly::coro::Task<SubscribeUpdateResult>
-  subscribeUpdate(moxygen::SubscribeUpdate subUpdate) override;
+  folly::coro::Task<moxygen::SubscriptionHandle::RequestUpdateResult>
+  requestUpdate(moxygen::RequestUpdate reqUpdate) override;
 
   void setTrackConsumer(std::shared_ptr<moxygen::TrackConsumer> consumer) {
     trackConsumer_ = std::move(consumer);
@@ -64,6 +64,9 @@ public:
 
   void fetchCancel() override;
   bool wasCancelled() const { return cancel_called_; }
+
+  folly::coro::Task<moxygen::Publisher::FetchHandle::RequestUpdateResult>
+  requestUpdate(moxygen::RequestUpdate reqUpdate) override;
 
 private:
   bool cancel_called_{false};
@@ -146,31 +149,32 @@ public:
 
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
   object(uint64_t groupID, uint64_t subgroupID, uint64_t objectID,
-         moxygen::Payload payload, moxygen::Extensions extensions,
-         bool finFetch);
+         moxygen::Payload payload, moxygen::Extensions extensions = moxygen::noExtensions(),
+         bool finFetch = false,
+         bool forwardingPreferenceIsDatagram = false) override;
 
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
   beginObject(uint64_t groupID, uint64_t subgroupID, uint64_t objectID,
               uint64_t length, moxygen::Payload initialPayload,
-              moxygen::Extensions extensions);
+              moxygen::Extensions extensions = moxygen::noExtensions()) override;
 
   folly::Expected<moxygen::ObjectPublishStatus, moxygen::MoQPublishError>
-  objectPayload(moxygen::Payload payload, bool finSubgroup);
+  objectPayload(moxygen::Payload payload, bool finSubgroup = false) override;
 
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
   endOfGroup(uint64_t groupID, uint64_t subgroupID, uint64_t objectID,
-             bool finFetch);
+             bool finFetch = false) override;
 
   folly::Expected<folly::Unit, moxygen::MoQPublishError>
   endOfTrackAndGroup(uint64_t groupID, uint64_t subgroupID,
-                     uint64_t objectID);
+                     uint64_t objectID) override;
 
-  folly::Expected<folly::Unit, moxygen::MoQPublishError> endOfFetch();
+  folly::Expected<folly::Unit, moxygen::MoQPublishError> endOfFetch() override;
 
-  void reset(moxygen::ResetStreamErrorCode error);
+  void reset(moxygen::ResetStreamErrorCode error) override;
 
   folly::Expected<folly::SemiFuture<uint64_t>, moxygen::MoQPublishError>
-  awaitReadyToConsume();
+  awaitReadyToConsume() override;
 };
 
 // Mock Publisher implementation to handle incoming SUBSCRIBE requests
