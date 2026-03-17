@@ -4,6 +4,17 @@ project(interop_tests)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ----- Sanitizer support -----
+# Build with:  cmake -DSANITIZE=address  (or =thread, =undefined)
+set(SANITIZE "" CACHE STRING "Enable a sanitizer: address, thread, undefined (default: none)")
+
+if(SANITIZE)
+    message(STATUS "Sanitizer: ${SANITIZE}")
+    add_compile_options(-fsanitize=${SANITIZE} -fno-omit-frame-pointer -g -O1)
+    add_link_options(-fsanitize=${SANITIZE})
+endif()
+# ----------------------------
+
 # Use moxygen library directly
 message(STATUS "Building with native moxygen library")
 
@@ -23,7 +34,7 @@ message(STATUS "Moxygen install dir: ${MOXYGEN_INSTALL_DIR}")
 get_filename_component(DEPS_BASE_DIR ${MOXYGEN_INSTALL_DIR} DIRECTORY)
 
 # Find the built moxygen library directly
-find_library(MOXYGEN_LIB moxygen PATHS ${MOXYGEN_INSTALL_DIR}/lib NO_DEFAULT_PATH)
+find_library(MOXYGEN_LIB moxygen_moq PATHS ${MOXYGEN_INSTALL_DIR}/lib NO_DEFAULT_PATH)
 if(NOT MOXYGEN_LIB)
     message(FATAL_ERROR "Moxygen library not found in ${MOXYGEN_INSTALL_DIR}/lib")
 endif()
@@ -41,17 +52,20 @@ file(GLOB LZ4_DIR ${DEPS_BASE_DIR}/lz4*)
 file(GLOB LIBEVENT_DIR ${DEPS_BASE_DIR}/libevent*)
 
 # Find main libraries
-# Find all moxygen libraries
-find_library(MOXYGEN_LIB moxygen PATHS ${DEPS_BASE_DIR}/moxygen/lib NO_DEFAULT_PATH)
-find_library(MOQRELAY_LIB moqrelay PATHS ${DEPS_BASE_DIR}/moxygen/lib NO_DEFAULT_PATH)
-find_library(MOQCACHE_LIB moqcache PATHS ${DEPS_BASE_DIR}/moxygen/lib NO_DEFAULT_PATH)
-find_library(MLOGGER_LIB mlogger PATHS ${DEPS_BASE_DIR}/moxygen/lib NO_DEFAULT_PATH)
-find_library(FLVPARSER_LIB flvparser PATHS ${DEPS_BASE_DIR}/moxygen/lib NO_DEFAULT_PATH)
-find_library(MOQMI_LIB moqmi PATHS ${DEPS_BASE_DIR}/moxygen/lib NO_DEFAULT_PATH)
+# Find all moxygen libraries using GLOB
+file(GLOB MOXYGEN_ALL_LIBS "${MOXYGEN_INSTALL_DIR}/lib/libmoxygen*.a")
+
+# Find specific moxygen libraries for dependency order
+find_library(MOQRELAY_LIB moxygen_relay_moq_relay PATHS ${MOXYGEN_INSTALL_DIR}/lib NO_DEFAULT_PATH)
+find_library(MOQCACHE_LIB moxygen_relay_moq_cache PATHS ${MOXYGEN_INSTALL_DIR}/lib NO_DEFAULT_PATH)
+find_library(MLOGGER_LIB moxygen_mlog_mlogger PATHS ${MOXYGEN_INSTALL_DIR}/lib NO_DEFAULT_PATH)
+find_library(FLVPARSER_LIB moxygen_flv_parser_flv_reader PATHS ${MOXYGEN_INSTALL_DIR}/lib NO_DEFAULT_PATH)
+find_library(MOQMI_LIB moxygen_moq_mi PATHS ${MOXYGEN_INSTALL_DIR}/lib NO_DEFAULT_PATH)
+find_library(MOQTYPES_LIB moxygen_moq_types PATHS ${MOXYGEN_INSTALL_DIR}/lib NO_DEFAULT_PATH)
 find_library(FOLLY_LIB folly PATHS ${DEPS_BASE_DIR}/folly/lib NO_DEFAULT_PATH)
 find_library(FIZZ_LIB fizz PATHS ${DEPS_BASE_DIR}/fizz/lib NO_DEFAULT_PATH)
 find_library(PROXYGEN_LIB proxygen PATHS ${DEPS_BASE_DIR}/proxygen/lib NO_DEFAULT_PATH)
-find_library(QUIC_WEBTRANSPORT_LIB quicwebtransport PATHS ${DEPS_BASE_DIR}/proxygen/lib NO_DEFAULT_PATH)
+find_library(QUIC_WEBTRANSPORT_LIB proxygen_http_webtransport_quicwebtransport PATHS ${DEPS_BASE_DIR}/proxygen/lib NO_DEFAULT_PATH)
 find_library(WANGLE_LIB wangle PATHS ${DEPS_BASE_DIR}/wangle/lib NO_DEFAULT_PATH)
 # Find ALL mvfst libraries using GLOB
 file(GLOB MVFST_LIBS "${DEPS_BASE_DIR}/mvfst/lib/libmvfst*.a")
@@ -166,16 +180,10 @@ find_library(BOOST_CONTEXT_LIB boost_context PATHS ${BOOST_DIR}/lib NO_DEFAULT_P
 find_library(BOOST_SYSTEM_LIB boost_system PATHS ${BOOST_DIR}/lib NO_DEFAULT_PATH)
 find_library(BOOST_THREAD_LIB boost_thread PATHS ${BOOST_DIR}/lib NO_DEFAULT_PATH)
 
-# Add moxygen source files we need
-set(MOXYGEN_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../moqt_implementation/moxygen/moxygen)
-set(MOXYGEN_SOURCES
-    ${MOXYGEN_SRC_DIR}/MoQClient.cpp
-    ${MOXYGEN_SRC_DIR}/MoQWebTransportClient.cpp
-    ${MOXYGEN_SRC_DIR}/MoQClientBase.cpp
-    ${MOXYGEN_SRC_DIR}/MoQRelaySession.cpp
-    ${MOXYGEN_SRC_DIR}/events/MoQFollyExecutorImpl.cpp
-    ${MOXYGEN_SRC_DIR}/util/QuicConnector.cpp
-)
+# Boost libraries
+find_library(BOOST_CONTEXT_LIB boost_context PATHS ${BOOST_DIR}/lib NO_DEFAULT_PATH)
+find_library(BOOST_SYSTEM_LIB boost_system PATHS ${BOOST_DIR}/lib NO_DEFAULT_PATH)
+find_library(BOOST_THREAD_LIB boost_thread PATHS ${BOOST_DIR}/lib NO_DEFAULT_PATH)
 
 add_executable(interop_tests
     main.cpp
@@ -197,7 +205,6 @@ add_executable(interop_tests
     moxygen_adapter/moxygen_fixture.cpp
     base/base_test.cpp
     base/moqt_interface.cpp
-    ${MOXYGEN_SOURCES}
 )
 
 # Include moxygen and dependency headers
@@ -234,16 +241,10 @@ target_include_directories(interop_tests PRIVATE
 
 # Link against all required libraries - order matters for static libraries
 target_link_libraries(interop_tests
-    # Start with moxygen libraries in dependency order
-    ${MOXYGEN_LIB}
-    ${MOQRELAY_LIB}
-    ${MOQCACHE_LIB}
-    ${MLOGGER_LIB}
-    ${MOQMI_LIB}
-    ${FLVPARSER_LIB}
-    # Proxygen and WebTransport
+    # Link all moxygen libraries
+    ${MOXYGEN_ALL_LIBS}
+    # Proxygen
     ${PROXYGEN_LIB}
-    ${QUIC_WEBTRANSPORT_LIB}
     # Then mvfst libraries
     ${MVFST_LIBS}
     # Then the rest in dependency order
@@ -277,6 +278,9 @@ if(SODIUM_LIB)
 endif()
 if(OQS_LIB)
     target_link_libraries(interop_tests ${OQS_LIB})
+endif()
+if(QUIC_WEBTRANSPORT_LIB)
+    target_link_libraries(interop_tests ${QUIC_WEBTRANSPORT_LIB})
 endif()
 if(UNWIND_LIB)
     target_link_libraries(interop_tests ${UNWIND_LIB})

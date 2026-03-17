@@ -98,5 +98,11 @@ int main(int argc, char *argv[]) {
   // Run all tests
   bool success = testSuite->runAll(config);
 
+  // // Destroy test suite BEFORE EventBaseThread so all sessions are cleaned up
+  // // before the EventBase stops.
+  // testSuite.reset();
+
+  // eventBaseThread.stop();
+
   return success ? 0 : 1;
 }
