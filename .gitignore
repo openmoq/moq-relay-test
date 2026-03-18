@@ -1,5 +1,3 @@
 build/
 interop_tests/build/
-moqt_implementation/moxygen/
 .vscode/*
-build/

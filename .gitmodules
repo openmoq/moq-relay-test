@@ -1,0 +1,3 @@
+[submodule "moqt_implementation/moxygen/moxygen"]
+	path = moqt_implementation/moxygen/moxygen
+	url = https://github.com/facebookexperimental/moxygen.git

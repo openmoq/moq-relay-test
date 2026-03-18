@@ -19,7 +19,7 @@ endif()
 message(STATUS "Building with native moxygen library")
 
 # Set moxygen paths
-set(MOXYGEN_DIR ${CMAKE_SOURCE_DIR}/../moqt_implementation/moxygen)
+set(MOXYGEN_DIR ${CMAKE_SOURCE_DIR}/../moqt_implementation/moxygen/moxygen)
 
 # Get moxygen installation directory dynamically
 execute_process(

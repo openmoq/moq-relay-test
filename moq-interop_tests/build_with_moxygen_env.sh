@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Build script that uses moxygen environment
-cd "$PROJECT_ROOT/moqt_implementation/moxygen"
+cd "$PROJECT_ROOT/moqt_implementation/moxygen/moxygen"
 
 # Build moxygen first if not already built
 echo "Building moxygen..."
