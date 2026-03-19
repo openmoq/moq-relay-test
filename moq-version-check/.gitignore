@@ -1,0 +1,25 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Runtime files
+*.pid
+*.sock
+
+# Environment secrets
+.env
+
+# Results
+results/*
+!results/.gitkeep
