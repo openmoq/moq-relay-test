@@ -1,0 +1,13 @@
+services:
+  moq-version-check:
+    build: .
+    image: moq-version-check:latest
+    container_name: moq-version-check
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      PORT: 8080
+      LOG_LEVEL: info
