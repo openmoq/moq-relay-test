@@ -1,4 +1,5 @@
 build/
 interop_tests/build/
 .vscode/*
-moqt_implementation/moxygen/certs/
+**/moxygen/certs/
+**/.scratch/
