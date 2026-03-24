@@ -1,0 +1,4 @@
+aioquic>=0.9.25
+flask>=3.0
+gunicorn>=21.0
+gevent>=23.0
