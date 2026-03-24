@@ -1,0 +1,24 @@
+# ── Heavy build artefacts (never needed in Docker context) ──────────────────
+# NOTE: moqt_implementation/moxygen/moxygen/build/ is intentionally NOT
+# excluded — it contains fbcode_builder/getdeps.py which the Dockerfile
+# builder stage requires. Getdeps compiled outputs go to /tmp inside
+# the container (not this directory) so there is nothing heavy to exclude here.
+.scratch/
+moq-interop_tests/build/
+moq-interop_tests/build_*/
+
+# ── Git metadata ─────────────────────────────────────────────────────────────
+**/.git/
+**/.gitmodules
+
+# ── Generated certs (re-created inside the image) ────────────────────────────
+moqt_implementation/moxygen/certs/
+
+# ── macOS artefacts ──────────────────────────────────────────────────────────
+**/.DS_Store
+**/__pycache__/
+**/*.pyc
+
+# ── Editor / IDE ─────────────────────────────────────────────────────────────
+**/.vscode/
+**/.idea/
