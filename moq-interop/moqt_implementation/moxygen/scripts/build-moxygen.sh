@@ -6,17 +6,18 @@
 # using getdeps default paths, then refreshes the moxygen rev stamp.
 #
 # Usage:
-#   ./scripts/build-moxygen.sh
+#   ./scripts/build-moxygen.sh [--clean]
 
 set -euo pipefail
 
+CLEAN_FLAG=""
+[[ "${1:-}" == "--clean" ]] && CLEAN_FLAG="--clean"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-INTEROP_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 MOXYGEN_DIR="${PROJECT_ROOT}/moxygen"
 GETDEPS="${MOXYGEN_DIR}/build/fbcode_builder/getdeps.py"
-STAMP_DIR="${INTEROP_ROOT}/.scratch"
 
 # ── Sanity checks ─────────────────────────────────────────────────────────────
 
@@ -25,19 +26,10 @@ if [[ ! -f "$GETDEPS" ]]; then
   exit 1
 fi
 
-if [[ ! -f "${STAMP_DIR}/moxygen.rev" ]]; then
-  echo "Error: no prior setup found. Run ./scripts/setup-deps.sh first." >&2
-  exit 1
-fi
-
 # ── Rebuild moxygen ───────────────────────────────────────────────────────────
 
 echo "==> Rebuilding moxygen..."
 cd "$MOXYGEN_DIR"
-python3 "$GETDEPS" build --no-tests moxygen
-
-# ── Refresh stamp ─────────────────────────────────────────────────────────────
-
-git -C "$MOXYGEN_DIR" rev-parse HEAD > "${STAMP_DIR}/moxygen.rev"
+python3 "$GETDEPS" build --no-tests $CLEAN_FLAG moxygen
 
 echo "==> moxygen rebuild complete."

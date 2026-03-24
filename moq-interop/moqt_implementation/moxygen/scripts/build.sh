@@ -6,16 +6,17 @@
 # On subsequent runs, detects whether the moxygen submodule has changed
 # and only rebuilds what is necessary.
 #
-# getdeps uses .scratch/ (inside this folder) as its scratch path.
-#
 # Usage:
-#   ./scripts/build.sh [sanitize_type]
+#   ./scripts/build.sh [preset] [--clean]
 #
-# Examples:
-#   ./scripts/build.sh                 # default build  → build/
-#   ./scripts/build.sh address         # ASAN           → build_address/
-#   ./scripts/build.sh thread          # TSAN           → build_thread/
-#   ./scripts/build.sh undefined       # UBSAN          → build_undefined/
+# Presets (from CMakePresets.json):
+#   moxygen        — full build with moxygen_adapter  (default) → build/
+#   moxygen-san    — full build with ASAN                       → build_address/
+#   moxygen-tsan   — full build with TSAN                       → build_thread/
+#   core           — base + publisher_tests, no moxygen         → build_core/
+#
+# Options:
+#   --clean        Clean and rebuild all dependencies from scratch
 
 set -euo pipefail
 
@@ -25,31 +26,63 @@ INTEROP_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 MOXYGEN_DIR="${PROJECT_ROOT}/moxygen"
 GETDEPS="${MOXYGEN_DIR}/build/fbcode_builder/getdeps.py"
-STAMP_DIR="${INTEROP_ROOT}/.scratch"
 
-SANITIZE="${1:-}"
+# Parse arguments: preset and --clean flag
+PRESET="${1:-moxygen}"
+CLEAN_FLAG=""
+if [[ "${2:-}" == "--clean" ]]; then
+  CLEAN_FLAG="--clean"
+elif [[ "${PRESET}" == "--clean" ]]; then
+  # Allow --clean as first argument
+  CLEAN_FLAG="--clean"
+  PRESET="moxygen"
+fi
+
 SOURCE_DIR="${INTEROP_ROOT}/moq-interop_tests"
-BUILD_DIR="${SOURCE_DIR}/build$([ -n "$SANITIZE" ] && echo "_${SANITIZE}" || echo "")"
 
-MOXYGEN_REV_FILE="${STAMP_DIR}/moxygen.rev"
+# Map preset name to the binaryDir defined in CMakePresets.json
+case "$PRESET" in
+  moxygen)     BUILD_DIR="${SOURCE_DIR}/build"         ;;
+  moxygen-san) BUILD_DIR="${SOURCE_DIR}/build_address" ;;
+  moxygen-tsan)BUILD_DIR="${SOURCE_DIR}/build_thread"  ;;
+  core)        BUILD_DIR="${SOURCE_DIR}/build_core"    ;;
+  *)
+    echo "Unknown preset '${PRESET}'. Valid: moxygen, moxygen-san, moxygen-tsan, core" >&2
+    exit 1 ;;
+esac
 
 # ── Helper functions ──────────────────────────────────────────────────────────
 
-needs_setup() {
-  [[ ! -f "$MOXYGEN_REV_FILE" ]]
+moxygen_inst_dir() {
+  python3 "$GETDEPS" show-inst-dir moxygen 2>/dev/null | tail -1
+}
+
+moxygen_is_installed() {
+  local inst
+  inst="$(moxygen_inst_dir)"
+  [[ -n "$inst" ]] && ls "$inst"/lib/libmoxygen*.a &>/dev/null
 }
 
 moxygen_rev() {
   git -C "$MOXYGEN_DIR" rev-parse HEAD 2>/dev/null || echo "unknown"
 }
 
+moxygen_rev_stamp() {
+  local inst
+  inst="$(moxygen_inst_dir)"
+  echo "${inst}/.moq-relay-moxygen.rev"
+}
+
 moxygen_changed() {
-  local current
-  current=$(moxygen_rev)
-  if [[ ! -f "$MOXYGEN_REV_FILE" ]] || [[ "$current" != "$(cat "$MOXYGEN_REV_FILE")" ]]; then
-    return 0
-  fi
-  return 1
+  local stamp
+  stamp="$(moxygen_rev_stamp)"
+  [[ ! -f "$stamp" ]] || [[ "$(cat "$stamp")" != "$(moxygen_rev)" ]]
+}
+
+write_rev_stamp() {
+  local stamp
+  stamp="$(moxygen_rev_stamp)"
+  moxygen_rev > "$stamp"
 }
 
 needs_configure() {
@@ -65,30 +98,42 @@ if [[ ! -f "$GETDEPS" ]]; then
 fi
 
 # ── Set up cmake / ninja / compilers from getdeps ────────────────────────────
+# Save system cmake before getdeps prepends its own (which may lack share/)
+# Export so configure.sh inherits the pre-getdeps cmake path.
+export SYSTEM_CMAKE="$(command -v cmake 2>/dev/null || true)"
 
 eval "$(cd "$MOXYGEN_DIR" && python3 "$GETDEPS" env moxygen)"
+
+CMAKE_BIN="${SYSTEM_CMAKE:-cmake}"
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 NEED_CONFIGURE=false
 
-if needs_setup; then
-  echo "==> No prior build found — running full setup..."
+if [[ -n "$CLEAN_FLAG" ]]; then
+  echo "==> --clean requested: rebuilding all dependencies..."
+  "${SCRIPT_DIR}/setup-deps.sh" "$CLEAN_FLAG"
+  write_rev_stamp
+  NEED_CONFIGURE=true
+elif ! moxygen_is_installed; then
+  echo "==> moxygen not found — running full setup..."
   "${SCRIPT_DIR}/setup-deps.sh"
+  write_rev_stamp
   NEED_CONFIGURE=true
 elif moxygen_changed; then
-  echo "==> Moxygen submodule changed — rebuilding moxygen..."
+  echo "==> moxygen submodule changed — rebuilding moxygen..."
   "${SCRIPT_DIR}/build-moxygen.sh"
+  write_rev_stamp
   NEED_CONFIGURE=true
 fi
 
 if [[ "$NEED_CONFIGURE" == true ]] || needs_configure; then
-  "${SCRIPT_DIR}/configure.sh" "$BUILD_DIR" "$SANITIZE"
+  "${SCRIPT_DIR}/configure.sh" "$PRESET"
 fi
 
-echo "==> Building moq-interop_tests ($([ -n "$SANITIZE" ] && echo "sanitizer=${SANITIZE}" || echo "release"))..."
+echo "==> Building moq-interop_tests (preset=${PRESET})..."
 NPROC=$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
-cmake --build "$BUILD_DIR" -- -j"$NPROC"
+"$CMAKE_BIN" --build "$BUILD_DIR" -- -j"$NPROC"
 
 BINARY="${BUILD_DIR}/bin/interop_tests"
 if [[ -f "$BINARY" ]]; then

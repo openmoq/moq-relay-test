@@ -1,6 +1,8 @@
 #include "test_suite.h"
 #include "base/base_test.h"
+#ifdef WITH_MOXYGEN_ADAPTER
 #include "moxygen_adapter/moxygen_fixture.h"
+#endif
 #include <algorithm>
 #include <iostream>
 
@@ -72,8 +74,10 @@ bool TestSuite::runTest(const std::string &testName,
     std::cout << "Description: " << test->getDescription() << "\n";
 
     // Create and set the fixture
+#ifdef WITH_MOXYGEN_ADAPTER
     auto fixture = std::make_shared<MoxygenTestFixture>(context);
     test->setFixture(fixture);
+#endif
 
     TestResult result = test->run();
 
