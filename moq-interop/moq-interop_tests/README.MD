@@ -2,153 +2,192 @@
 
 This directory contains the MoQ interoperability test suite for testing MoQ relay implementations.
 
-## Building
+There are two ways to build and run the tests:
 
-To build the tests, you need to use the provided build script that sets up the Moxygen environment:
+| Method | When to use |
+|---|---|
+| **Docker** (recommended) | Any machine with Docker — no local C++ toolchain needed |
+| **Local build** | macOS/Linux with moxygen already built |
 
-```bash
-./build_with_moxygen_env.sh
-```
+---
 
-This script will:
-1. Set up the necessary Moxygen environment variables
-2. Run CMake configuration
-3. Build the project
+## Method 1 — Docker (Recommended)
 
-The compiled binary will be located at `build/bin/interop_tests`.
+The `moq-interop/Makefile` wraps the full Docker workflow. Run everything from
+the `moq-interop/` directory.
 
-Alternatively, if the Moxygen environment is already configured, you can build manually:
-
-```bash
-cd build
-cmake ..
-make
-```
-
-## Usage
+### Build the image
 
 ```bash
-./build/bin/interop_tests [OPTIONS]
+cd moq-interop
+make build
 ```
 
-## CLI Parameters
+The first build fetches and compiles all Meta OSS dependencies inside Docker
+(30–60 min). The getdeps cache is stored in a BuildKit persistent cache volume
+so subsequent builds are fast even after source changes.
 
-### `--relay` (string)
-Specifies the MoQ relay server URL to connect to for testing.
+### Run the tests
 
-**Default:** `https://localhost:4433/moq`
+Start your relay first, then:
 
-**Example:**
 ```bash
-./build/bin/interop_tests --relay=https://relay.example.com:4433/moq
+# Run all tests (localhost is auto-rewritten to host.docker.internal)
+make tests RELAY_URL=https://localhost:4433/moq
+
+# Custom port / path
+make tests RELAY_URL=https://localhost:9668/moq-relay
+
+# Remote relay
+make tests RELAY_URL=https://relay.example.com:4433/moq
+
+# Filter by category
+make tests RELAY_URL=https://localhost:4433/moq TESTS_ARGS="--categories=Publisher,Subscriber"
+
+# Run a specific test
+make tests RELAY_URL=https://localhost:4433/moq TESTS_ARGS="--tests=PublishTest"
+
+# Verbose build output
+make build DOCKER_BUILD_FLAGS="--progress=plain"
 ```
 
-### `--tests` (string)
-Comma-separated list of specific test names to run. If empty, all tests will be executed.
+> **Note:** `localhost` and `127.0.0.1` in `RELAY_URL` are automatically
+> rewritten to `host.docker.internal` so the container can reach a relay
+> running on the host.
 
-**Default:** (empty - runs all tests)
+### Open an interactive shell in the container
 
-**Example:**
 ```bash
-# Run a single test
-./build/bin/interop_tests --tests=publish_test
-
-# Run multiple specific tests
-./build/bin/interop_tests --tests=publish_test,subscribe_test,goaway_test
+make shell
 ```
 
-### `--categories` (string)
-Comma-separated list of test categories to filter which tests should run. This allows you to run only tests from specific categories.
+---
 
-**Default:** (empty - runs all categories)
+## Method 2 — Local Build
 
-**Available Categories:**
-- `Publisher` - Tests related to publishing data
-- `Subscriber` - Tests related to subscribing to data
-- `Namespace` - Tests related to namespace operations
-- `ErrorHandling` - Tests related to error scenarios
-- `Update` - Tests related to update operations
-- `Connection` - Tests related to connection management
-- `All` - Run all tests (default behavior)
+moxygen must already be built (see the
+[moqt_implementation README](../moqt_implementation/README.md)) before
+configuring or building the interop tests.
 
-**Example:**
+### One-step build (recommended)
+
+From `moqt_implementation/moxygen/`:
+
 ```bash
-# Run only publisher tests
-./build/bin/interop_tests --categories=Publisher
-
-# Run publisher and subscriber tests
-./build/bin/interop_tests --categories=Publisher,Subscriber
-
-# Run error handling tests
-./build/bin/interop_tests --categories=ErrorHandling
+bash scripts/build.sh              # default: moxygen preset
+bash scripts/build.sh moxygen-san  # AddressSanitizer build
+bash scripts/build.sh core         # no moxygen_adapter
 ```
 
-**Note:** Category names are case-insensitive, and `error_handling` can be used as an alternative to `ErrorHandling`.
+The compiled binary is placed at `moq-interop_tests/build/bin/interop_tests`.
 
-### `--list` (boolean flag)
-Lists all available tests without running them. Useful for discovering test names before running specific tests.
+### Manual configure + build
 
-**Default:** `false`
+Source the getdeps environment first, then:
 
-**Example:**
 ```bash
-./build/bin/interop_tests --list
+# Source getdeps env
+cd moqt_implementation/moxygen/moxygen
+eval "$(python3 build/fbcode_builder/getdeps.py env moxygen)"
+
+# Configure
+cmake -S ../../../moq-interop_tests \
+      -B ../../../moq-interop_tests/build \
+      -G Ninja \
+      -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+      -DWITH_MOXYGEN_ADAPTER=ON
+
+# Build
+cmake --build ../../../moq-interop_tests/build -- -j$(nproc)
 ```
 
-## Common Usage Examples
+### Run
 
-### Run all tests against local relay
+Start the relay first, then from `moq-interop_tests/`:
+
 ```bash
 ./build/bin/interop_tests
 ```
 
-### Run all tests against a remote relay
+Or with the logging wrapper:
+
 ```bash
-./build/bin/interop_tests --relay=https://relay.example.com:4433/moq
+bash run_with_logging.sh
+bash run_with_logging.sh --asan   # ASAN build
 ```
 
-### List all available tests
+---
+
+## CLI Reference
+
+The binary accepts these flags (passed via `TESTS_ARGS` in Docker, or directly for local builds):
+
+| Flag | Default | Description |
+|---|---|---|
+| `--relay=<url>` | `https://localhost:4433/moq` | Relay URL to test against |
+| `--tests=<names>` | _(all)_ | Comma-separated test names to run |
+| `--categories=<cats>` | _(all)_ | Comma-separated categories (see below) |
+| `--list` | `false` | List available tests without running them |
+
+**Available categories:** `Publisher`, `Subscriber`, `Namespace`, `ErrorHandling`, `Update`, `Connection`, `All`
+
+Category names are case-insensitive (`error_handling` and `ErrorHandling` are equivalent).
+
+### Examples (Docker)
+
 ```bash
+# List all available tests
+make tests RELAY_URL=https://localhost:4433/moq TESTS_ARGS="--list"
+
+# Run all tests against local relay
+make tests RELAY_URL=https://localhost:4433/moq
+
+# Run only publisher tests
+make tests RELAY_URL=https://localhost:4433/moq TESTS_ARGS="--categories=Publisher"
+
+# Run publisher and subscriber tests
+make tests RELAY_URL=https://localhost:4433/moq TESTS_ARGS="--categories=Publisher,Subscriber"
+
+# Run a specific named test
+make tests RELAY_URL=https://localhost:4433/moq TESTS_ARGS="--tests=PublishTest"
+
+# Run against a remote relay
+make tests RELAY_URL=https://relay.example.com:4433/moq
+```
+
+### Examples (local binary)
+
+```bash
+# List all available tests
 ./build/bin/interop_tests --list
+
+# Run all tests
+./build/bin/interop_tests --relay=https://localhost:4433/moq
+
+# Run by category
+./build/bin/interop_tests --relay=https://localhost:4433/moq --categories=Subscriber,ErrorHandling
+
+# Run a specific test
+./build/bin/interop_tests --relay=https://localhost:4433/moq --tests=PublishTest
 ```
 
-### Run only publisher-related tests
-```bash
-./build/bin/interop_tests --categories=Publisher
-```
-
-### Run specific tests by name
-```bash
-./build/bin/interop_tests --tests=publish_test,subscribe_test
-```
-
-### Run subscriber and error handling tests on a specific relay
-```bash
-./build/bin/interop_tests --relay=https://relay.example.com:4433/moq --categories=Subscriber,ErrorHandling
-```
-
-### Combine filters: specific tests from a category
-```bash
-# First list tests to see what's available
-./build/bin/interop_tests --list --categories=Publisher
-
-# Then run specific tests from that category
-./build/bin/interop_tests --tests=publish_test,publish_namespace_test
-```
+---
 
 ## Exit Codes
 
-- `0` - All tests passed successfully
-- `1` - One or more tests failed
+| Code | Meaning |
+|---|---|
+| `0` | All tests passed |
+| `1` | One or more tests failed |
+
+---
 
 ## Test Structure
 
-Tests are organized into the following directories:
-- `publisher_tests/` - Publisher-related tests
-- `subscriber_tests/` - Subscriber-related tests
-- `base/` - Base test framework and utilities
-- `moxygen_adapter/` - Adapter layer for the Moxygen implementation
-
-## Additional Scripts
-
-- `build_with_moxygen_env.sh` - Build script with Moxygen environment setup
+```
+moq-interop_tests/
+├── publisher_tests/    # Publisher-related tests
+├── subscriber_tests/   # Subscriber-related tests
+├── base/               # Base test framework and utilities
+└── moxygen_adapter/    # Adapter layer for the moxygen implementation
+```

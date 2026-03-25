@@ -14,6 +14,8 @@
 #   moxygen-san    — full build with ASAN                       → build_address/
 #   moxygen-tsan   — full build with TSAN                       → build_thread/
 #   core           — base + publisher_tests, no moxygen         → build_core/
+#   docker         — Linux-only, simplified CMakeLists           → build/
+#   docker-san     — Linux-only + ASAN                           → build_address/
 #
 # Options:
 #   --clean        Clean and rebuild all dependencies from scratch
@@ -40,14 +42,16 @@ fi
 
 SOURCE_DIR="${INTEROP_ROOT}/moq-interop_tests"
 
-# Map preset name to the binaryDir defined in CMakePresets.json
+# Map preset name to the binary output directory
 case "$PRESET" in
   moxygen)     BUILD_DIR="${SOURCE_DIR}/build"         ;;
   moxygen-san) BUILD_DIR="${SOURCE_DIR}/build_address" ;;
   moxygen-tsan)BUILD_DIR="${SOURCE_DIR}/build_thread"  ;;
   core)        BUILD_DIR="${SOURCE_DIR}/build_core"    ;;
+  docker)      BUILD_DIR="${SOURCE_DIR}/build"         ;;
+  docker-san)  BUILD_DIR="${SOURCE_DIR}/build_address" ;;
   *)
-    echo "Unknown preset '${PRESET}'. Valid: moxygen, moxygen-san, moxygen-tsan, core" >&2
+    echo "Unknown preset '${PRESET}'. Valid: moxygen, moxygen-san, moxygen-tsan, core, docker, docker-san" >&2
     exit 1 ;;
 esac
 

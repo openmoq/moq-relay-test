@@ -39,6 +39,9 @@ CMAKE_BIN="${SYSTEM_CMAKE:-cmake}"
 
 # ── Translate preset → cmake args ────────────────────────────────────────────
 
+# cmake source dir: usually equals SOURCE_DIR; docker presets use a subdirectory.
+CMAKE_SOURCE_DIR="${SOURCE_DIR}"
+
 case "$PRESET" in
   moxygen)
     BUILD_DIR="${SOURCE_DIR}/build"
@@ -56,21 +59,33 @@ case "$PRESET" in
     BUILD_DIR="${SOURCE_DIR}/build_core"
     CMAKE_EXTRA=(-DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_MOXYGEN_ADAPTER=OFF)
     ;;
+  # ── Docker-specific presets — use moq-interop_tests/docker/CMakeLists.txt ──
+  # Simpler, Linux-only CMake; no macOS conditionals, no platform guards.
+  docker)
+    BUILD_DIR="${SOURCE_DIR}/build"
+    CMAKE_SOURCE_DIR="${SOURCE_DIR}/docker"
+    CMAKE_EXTRA=(-DCMAKE_BUILD_TYPE=RelWithDebInfo)
+    ;;
+  docker-san)
+    BUILD_DIR="${SOURCE_DIR}/build_address"
+    CMAKE_SOURCE_DIR="${SOURCE_DIR}/docker"
+    CMAKE_EXTRA=(-DCMAKE_BUILD_TYPE=Debug -DSANITIZE=address)
+    ;;
   *)
-    echo "Unknown preset '${PRESET}'. Valid: moxygen, moxygen-san, moxygen-tsan, core" >&2
+    echo "Unknown preset '${PRESET}'. Valid: moxygen, moxygen-san, moxygen-tsan, core, docker, docker-san" >&2
     exit 1 ;;
 esac
 
 # ── Sanity check ──────────────────────────────────────────────────────────────
 
-if [[ ! -f "${SOURCE_DIR}/CMakeLists.txt" ]]; then
-  echo "Error: CMakeLists.txt not found at ${SOURCE_DIR}" >&2
+if [[ ! -f "${CMAKE_SOURCE_DIR}/CMakeLists.txt" ]]; then
+  echo "Error: CMakeLists.txt not found at ${CMAKE_SOURCE_DIR}" >&2
   exit 1
 fi
 
 # ── Configure ─────────────────────────────────────────────────────────────────
 
 echo "==> Configuring moq-interop_tests (preset: ${PRESET})"
-echo "    source : ${SOURCE_DIR}"
+echo "    source : ${CMAKE_SOURCE_DIR}"
 echo "    build  : ${BUILD_DIR}"
-"$CMAKE_BIN" -S "$SOURCE_DIR" -B "$BUILD_DIR" -G Ninja "${CMAKE_EXTRA[@]}"
+"$CMAKE_BIN" -S "$CMAKE_SOURCE_DIR" -B "$BUILD_DIR" -G Ninja "${CMAKE_EXTRA[@]}"

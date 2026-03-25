@@ -108,29 +108,27 @@ RUN --mount=type=cache,id=moq-interop-getdeps,target=/tmp/fbcode_builder_getdeps
 COPY moq-interop_tests/ ./moq-interop_tests/
 
 # ── Layer 5 — build interop_tests binary and stage it ───────────────────────
+# setup-deps generates ~2 MiB of verbose getdeps/Boost output that clips the
+# log before configure/link errors become visible.  We redirect it to a file;
+# on failure the last 60 lines are printed so the actual error is always shown.
 RUN --mount=type=cache,id=moq-interop-getdeps,target=/tmp/fbcode_builder_getdeps-ZworkspaceZmoqt_implementationZmoxygenZmoxygenZbuildZfbcode_builder-root,sharing=locked \
-    cd /workspace/moqt_implementation/moxygen && \
-    bash scripts/build.sh moxygen && \
-    mkdir -p /opt/moq/bin /opt/moq/lib && \
-    cp /workspace/moq-interop_tests/build/bin/interop_tests /opt/moq/bin/interop_tests && \
-    chmod +x /opt/moq/bin/interop_tests && \
-    echo "==> interop_tests shared libs (with build RPATH):" && ldd /opt/moq/bin/interop_tests || true && \
-    # Strip the build-time RPATH so the runtime image uses ldconfig / LD_LIBRARY_PATH
-    # rather than trying to open the getdeps paths that don't exist at runtime.
-    patchelf --remove-rpath /opt/moq/bin/interop_tests && \
-    echo "==> interop_tests shared libs (after RPATH removal):" && ldd /opt/moq/bin/interop_tests || true && \
-    # Explicitly stage getdeps-built shared libs that will not exist in the
-    # minimal runtime image.  getdeps builds glog/gflags as shared libraries;
-    # after removing the RPATH, ldd correctly reports them as 'not found' so
-    # the loop below picks them up.  We also cover the case by explicit pattern.
+    set -e; \
+    cd /workspace/moqt_implementation/moxygen; \
+    echo "==> docker/CMakeLists.txt: $(ls /workspace/moq-interop_tests/docker/CMakeLists.txt)"; \
+    bash scripts/build.sh docker > /tmp/build-docker.log 2>&1 || { echo "==> build.sh docker FAILED:"; tail -80 /tmp/build-docker.log; exit 1; }; \
+    echo "==> build.sh docker succeeded. Last configure/build lines:"; \
+    tail -20 /tmp/build-docker.log; \
+    mkdir -p /opt/moq/bin /opt/moq/lib; \
+    cp /workspace/moq-interop_tests/build/bin/interop_tests /opt/moq/bin/interop_tests; \
+    chmod +x /opt/moq/bin/interop_tests; \
+    patchelf --remove-rpath /opt/moq/bin/interop_tests; \
+    echo "==> Staging glog/gflags (.so files):"; \
     for pattern in "glog*/lib/libglog.so*" "gflags*/lib/libgflags.so*"; do \
-        echo "==> Staging pattern: ${pattern}"; \
         find /tmp/fbcode_builder_getdeps-*/installed/ -path "*/${pattern}" 2>/dev/null | while read f; do \
-            dest=/opt/moq/lib/$(basename "$f"); \
-            cp -L "$f" "$dest" && echo "  copied: $f -> $dest" || true; \
+            cp -L "$f" "/opt/moq/lib/$(basename "$f")" && echo "  staged: $(basename "$f")" || true; \
         done; \
-    done && \
-    echo "==> Staged libs:" && ls -la /opt/moq/lib/ || true
+    done; \
+    echo "==> Staged libs:"; ls -la /opt/moq/lib/
 
 # =============================================================================
 # Stage 2 — runtime
