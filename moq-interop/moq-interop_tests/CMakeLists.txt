@@ -111,6 +111,22 @@ endif()
 # libunwind (folly stack traces)
 find_library(UNWIND_LIB unwind)
 
+# liblzma — on Linux the getdeps-built libunwind.a references lzma_stream_buffer_decode.
+# Ubuntu 22.04's linker (binutils 2.38+) requires all transitive DSO deps to be
+# explicit on the command line; link lzma after unwind to satisfy this.
+if(UNIX AND NOT APPLE)
+    find_library(LZMA_LIB lzma)
+    if(LZMA_LIB)
+        message(STATUS "Found lzma library: ${LZMA_LIB}")
+    endif()
+endif()
+
+# libiberty — on Linux, cplus_demangle_v3_callback and rust_demangle_callback
+# are provided by stub_demangle.c (compiled directly into the binary) so that
+# the Docker build does not need either libiberty-dev or the Rust toolchain.
+# The stubs are no-ops that leave symbol names undemangled in stack traces;
+# this has no effect on test correctness.
+
 # lz4 (needed only by moxygen stack, but found here for include dir)
 set(LZ4_LIB "")
 if(WITH_MOXYGEN_ADAPTER)
@@ -200,6 +216,15 @@ set(CORE_SOURCES
     subscriber_tests/subscribe_namespace_test.cpp
 )
 
+# On Linux: add a no-op stub for rust_demangle_callback so that the linker is
+# satisfied even when the Rust toolchain is absent from the Docker build image.
+# folly is compiled with FOLLY_HAVE_RUST_DEMANGLE=1 by getdeps whenever CMake
+# detects a rustc binary; without the stub the final link would fail with an
+# undefined reference to `rust_demangle_callback'.
+if(UNIX AND NOT APPLE)
+    list(APPEND CORE_SOURCES stub_demangle.c)
+endif()
+
 # Moxygen-dependent: include <moxygen/MoQConsumers.h> directly
 set(MOXYGEN_SUBSCRIBER_SOURCES
     subscriber_tests/subscribe_test.cpp
@@ -267,8 +292,24 @@ endif()
 # -----------------------------------------------------------------------------
 
 # ----- Link libraries --------------------------------------------------------
-# Core stack (always): folly + logging + event + conversions + boost
-target_link_libraries(interop_tests
+# GNU ld (Linux, binutils 2.38+) processes static archives left-to-right in a
+# single pass and applies --as-needed to shared libs.  The Meta stack has
+# bidirectional deps (moxygen→folly, fizz→folly, libunwind→zlib/lzma, etc.).
+# Wrapping all archives in --start-group/--end-group makes ld re-scan the
+# group until every symbol is resolved.  macOS's ld handles this automatically.
+
+# ── zlib (needed by getdeps-built libunwind for decompression) ────────────────
+file(GLOB ZLIB_DIR   ${DEPS_BASE_DIR}/zlib*)
+find_library(ZLIB_LIB z PATHS ${ZLIB_DIR}/lib NO_DEFAULT_PATH)
+if(NOT ZLIB_LIB)
+    find_library(ZLIB_LIB z)
+endif()
+if(ZLIB_LIB)
+    message(STATUS "Found zlib library: ${ZLIB_LIB}")
+endif()
+
+# ── Accumulate all static archives into META_ARCHIVES ─────────────────────────
+set(META_ARCHIVES
     ${FOLLY_LIB}
     ${GLOG_LIB}
     ${GFLAGS_LIB}
@@ -279,19 +320,25 @@ target_link_libraries(interop_tests
     ${BOOST_SYSTEM_LIB}
     ${BOOST_THREAD_LIB}
 )
+
+if(UNWIND_LIB)
+    list(APPEND META_ARCHIVES ${UNWIND_LIB})
+endif()
+if(ZLIB_LIB)
+    list(APPEND META_ARCHIVES ${ZLIB_LIB})
+endif()
+if(LZMA_LIB)
+    list(APPEND META_ARCHIVES ${LZMA_LIB})
+endif()
 if(SSL_LIB)
-    target_link_libraries(interop_tests ${SSL_LIB})
+    list(APPEND META_ARCHIVES ${SSL_LIB})
 endif()
 if(CRYPTO_LIB)
-    target_link_libraries(interop_tests ${CRYPTO_LIB})
-endif()
-if(UNWIND_LIB)
-    target_link_libraries(interop_tests ${UNWIND_LIB})
+    list(APPEND META_ARCHIVES ${CRYPTO_LIB})
 endif()
 
-# Moxygen stack: moxygen + proxygen + mvfst + wangle + fizz + crypto extras
 if(WITH_MOXYGEN_ADAPTER)
-    target_link_libraries(interop_tests
+    list(APPEND META_ARCHIVES
         ${MOXYGEN_ALL_LIBS}
         ${PROXYGEN_LIB}
         ${MVFST_LIBS}
@@ -299,21 +346,27 @@ if(WITH_MOXYGEN_ADAPTER)
         ${FIZZ_LIB}
         ${ZSTD_LIB}
         ${LZ4_LIB}
-        # Second mvfst pass to resolve circular deps
-        ${MVFST_LIBS}
     )
     if(QUIC_WEBTRANSPORT_LIB)
-        target_link_libraries(interop_tests ${QUIC_WEBTRANSPORT_LIB})
+        list(APPEND META_ARCHIVES ${QUIC_WEBTRANSPORT_LIB})
     endif()
     if(SODIUM_LIB)
-        target_link_libraries(interop_tests ${SODIUM_LIB})
+        list(APPEND META_ARCHIVES ${SODIUM_LIB})
     endif()
     if(OQS_LIB)
-        target_link_libraries(interop_tests ${OQS_LIB})
+        list(APPEND META_ARCHIVES ${OQS_LIB})
     endif()
 endif()
 
-# System libraries
+# ── Link with group wrapping on Linux, plain on macOS ─────────────────────────
+if(UNIX AND NOT APPLE)
+    target_link_libraries(interop_tests
+        -Wl,--start-group ${META_ARCHIVES} -Wl,--end-group)
+else()
+    target_link_libraries(interop_tests ${META_ARCHIVES})
+endif()
+
+# ── System libraries (dynamic, outside the archive group) ─────────────────────
 target_link_libraries(interop_tests pthread dl)
 if(APPLE OR ${CMAKE_SYSTEM_NAME} MATCHES "BSD")
     target_link_libraries(interop_tests c++abi)

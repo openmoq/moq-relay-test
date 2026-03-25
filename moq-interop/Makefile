@@ -2,14 +2,12 @@
 # moq-interop Makefile
 # =============================================================================
 #
-# A single command builds and runs the full moq-interop suite anywhere Docker
+# A single command builds the moq-interop test suite anywhere Docker
 # is available — no local C++ toolchain required.
 #
 # Targets
 #   build     Build (or rebuild) the moq-interop Docker image.
-#   run       Build → start relay → run all interop tests (DEFAULT).
-#   relay     Run only the relay (foreground — Ctrl-C to stop).
-#   tests     Run only the interop tests against RELAY_URL.
+#   tests     Run the interop tests against RELAY_URL.
 #   shell     Open an interactive shell inside the container.
 #   clean     Remove the local Docker image.
 #   push      Tag and push the image to REGISTRY/IMAGE:TAG.
@@ -19,16 +17,14 @@
 #   IMAGE        Local image name              (default: moq-interop)
 #   TAG          Image tag                     (default: latest)
 #   REGISTRY     Registry prefix               (default: empty)
-#   RELAY_PORT   Host port exposed for QUIC    (default: 4433)
 #   RELAY_URL    Relay URL used by 'tests'     (default: https://localhost:4433/moq)
 #   TESTS_ARGS   Extra flags for interop_tests (default: empty)
 #
 # Examples
 #   make build
-#   make run
-#   make relay &                                        # relay in background
 #   make tests RELAY_URL=https://relay.example.com:4433/moq
-#   make run   TESTS_ARGS="--categories=Publisher,Subscriber"
+#   make tests RELAY_URL=https://host.docker.internal:9668/moq
+#   make tests TESTS_ARGS="--categories=Publisher,Subscriber"
 #   make push  REGISTRY=ghcr.io/myorg TAG=v1.2.3
 #   make build DOCKER_BUILD_FLAGS="--progress=plain"   # verbose build log
 # =============================================================================
@@ -45,8 +41,7 @@ else
 endif
 
 # ── Runtime parameters ────────────────────────────────────────────────────────
-RELAY_PORT  ?= 4433
-RELAY_URL   ?= https://localhost:$(RELAY_PORT)/moq
+RELAY_URL   ?= https://localhost:4433/moq
 TESTS_ARGS  ?=
 
 # ── Build parameters ──────────────────────────────────────────────────────────
@@ -62,11 +57,15 @@ BUILD_CTX  := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 DOCKERFILE := $(BUILD_CTX)/docker/Dockerfile
 
 DOCKER := docker
+# BuildKit is required for --mount=type=cache in the Dockerfile.
+# It is the default builder since Docker 23.x; this export ensures it is
+# active on any Docker version that supports it.
+export DOCKER_BUILDKIT := 1
 
 # ── Phony declarations ────────────────────────────────────────────────────────
-.PHONY: all build run relay tests shell clean push help
+.PHONY: all build tests shell clean push help
 
-all: run
+all: tests
 
 # ── build ─────────────────────────────────────────────────────────────────────
 # The build context is moq-interop/ (this directory).  .dockerignore in the
@@ -80,40 +79,14 @@ build:
 		-f $(DOCKERFILE) \
 		$(BUILD_CTX)
 
-# ── run (relay + tests in one container) ──────────────────────────────────────
-# The entrypoint starts moq_relay in the background, waits for it to bind,
-# then runs the full interop_tests suite and exits with the test exit code.
-run: build
-	$(DOCKER) run --rm \
-		--name moq-interop-run \
-		-p $(RELAY_PORT):$(RELAY_PORT)/udp \
-		-p $(RELAY_PORT):$(RELAY_PORT)/tcp \
-		-e RELAY_PORT=$(RELAY_PORT) \
-		$(IMAGE_REF) all $(TESTS_ARGS)
 
-# ── relay only ────────────────────────────────────────────────────────────────
-# Runs moq_relay in the foreground.  Press Ctrl-C to stop.
-# Useful for manually testing against a running relay from the host.
-relay: build
-	$(DOCKER) run --rm \
-		--name moq-relay \
-		-p $(RELAY_PORT):$(RELAY_PORT)/udp \
-		-p $(RELAY_PORT):$(RELAY_PORT)/tcp \
-		-e RELAY_PORT=$(RELAY_PORT) \
-		$(IMAGE_REF) relay
-
-# ── tests only ────────────────────────────────────────────────────────────────
-# Runs only interop_tests.  Requires a relay already reachable at RELAY_URL.
-#
-# Point at an external relay:
-#   make tests RELAY_URL=https://relay.example.com:4433/moq
-#
-# Point at a relay running on the host (Docker bridge networking):
-#   make tests RELAY_URL=https://host.docker.internal:4433/moq
+# ── tests ────────────────────────────────────────────────────────────────────────────
+# Runs the interop tests against a relay at RELAY_URL.
+# The relay must already be running before invoking this target.
 tests: build
 	$(DOCKER) run --rm \
 		--name moq-interop-tests \
-		$(IMAGE_REF) tests --relay=$(RELAY_URL) $(TESTS_ARGS)
+		$(IMAGE_REF) --relay=$(RELAY_URL) $(TESTS_ARGS)
 
 # ── interactive shell ─────────────────────────────────────────────────────────
 shell: build
@@ -133,9 +106,7 @@ push: build
 help:
 	@printf '\nmoq-interop — available make targets\n\n'
 	@printf '  %-12s  %s\n' build  'Build (or rebuild) the Docker image'
-	@printf '  %-12s  %s\n' run    'Build + start relay + run all interop tests (default)'
-	@printf '  %-12s  %s\n' relay  'Run only the relay (foreground)'
-	@printf '  %-12s  %s\n' tests  'Run only the interop tests (relay must be reachable)'
+	@printf '  %-12s  %s\n' tests  'Run the interop tests against RELAY_URL'
 	@printf '  %-12s  %s\n' shell  'Open an interactive shell in the container'
 	@printf '  %-12s  %s\n' clean  'Remove the local Docker image'
 	@printf '  %-12s  %s\n' push   'Push the image to REGISTRY/IMAGE:TAG'
@@ -144,16 +115,14 @@ help:
 	@printf '  %-18s  %s\n' TAG          '$(TAG)'
 	@printf '  %-18s  %s\n' REGISTRY     '$(if $(REGISTRY),$(REGISTRY),(none — local only))'
 	@printf '  %-18s  %s\n' IMAGE_REF    '$(IMAGE_REF)'
-	@printf '  %-18s  %s\n' RELAY_PORT   '$(RELAY_PORT)'
 	@printf '  %-18s  %s\n' RELAY_URL    '$(RELAY_URL)'
 	@printf '  %-18s  %s\n' TESTS_ARGS   '$(if $(TESTS_ARGS),$(TESTS_ARGS),(none))'
 	@printf '  %-18s  %s\n' NPROC        '$(NPROC)'
 	@printf '\nExamples\n\n'
 	@printf '  make build\n'
-	@printf '  make run\n'
-	@printf '  make relay                                     # relay in foreground\n'
 	@printf '  make tests RELAY_URL=https://relay.example.com:4433/moq\n'
-	@printf '  make run   TESTS_ARGS="--categories=Publisher,Subscriber"\n'
+	@printf '  make tests RELAY_URL=https://host.docker.internal:9668/moq\n'
+	@printf '  make tests TESTS_ARGS="--categories=Publisher,Subscriber"\n'
 	@printf '  make push  REGISTRY=ghcr.io/myorg TAG=v1.2.3\n'
 	@printf '  make build DOCKER_BUILD_FLAGS="--progress=plain"\n'
 	@printf '\n'

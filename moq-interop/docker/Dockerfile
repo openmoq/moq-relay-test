@@ -1,21 +1,25 @@
+# syntax=docker/dockerfile:1
 # =============================================================================
 # moq-interop — Multi-stage Docker build
 #
 # Stages
 #   builder  — Ubuntu 22.04 + full C++20 toolchain; builds moxygen and all
 #              Meta OSS deps via getdeps, then compiles the interop tests.
-#   runtime  — Minimal Ubuntu 22.04; contains only the two binaries and TLS
-#              certs.  Everything else is static-linked Meta OSS code.
+#   runtime  — Minimal Ubuntu 22.04; contains the interop_tests binary.
+#              All Meta OSS deps are statically linked.
 #
-# Layer-cache strategy
-#   1. System packages        (invalidated only on Ubuntu upgrade)
-#   2. moxygen submodule COPY (invalidated only when submodule changes)
-#   3. getdeps full build     (30–60 min cold; cache reused when layer 2 hits)
-#   4. moq-interop_tests COPY (invalidated on every test-source change)
-#   5. interop_tests build    (~1 min; runs whenever source changes)
+# Cache strategy
+#   getdeps compiles folly/fizz/wangle/mvfst/proxygen/moxygen from source
+#   (30–60 min cold build) into /tmp/fbcode_builder_getdeps-*/. That directory
+#   is wired to a BuildKit persistent cache volume (--mount=type=cache) rather
+#   than a regular Docker layer, so it survives Dockerfile edits without
+#   needing to be invalidated or re-built.
+#
+#   Subsequent builds (e.g. after editing interop_tests source) still get the
+#   full cached getdeps tree and only spend the ~1 min on the test compile.
 #
 # Build context: moq-interop/
-# Usage:        see ../Makefile  (make build / make run / make relay / …)
+# Usage:        see Makefile  (make build / make run / make tests / …)
 # =============================================================================
 
 # ── Build arguments ──────────────────────────────────────────────────────────
@@ -68,6 +72,11 @@ RUN apt-get update && \
         # Miscellaneous utilities used by build scripts
         patch \
         perl \
+        # Required at link time: getdeps-built libunwind.a references liblzma
+        liblzma-dev \
+        # Used in the staging step to strip embedded RPATH from the binary so
+        # the runtime stage can resolve shared libs via /opt/moq/lib + ldconfig
+        patchelf \
     && rm -rf /var/lib/apt/lists/*
 
 # Use GCC — gcc-11 ships with build-essential on Ubuntu 22.04 and handles
@@ -79,41 +88,49 @@ ENV CC=gcc CXX=g++
 # so it must stay stable across builds.
 WORKDIR /workspace
 
-# ── Layer 2 — moxygen submodule (heavy cached layer) ─────────────────────────
-# Copy only the moxygen submodule and helper scripts first.
-# As long as the submodule commit does not change, Docker reuses the next
-# (expensive) layer from cache instead of re-running the 30-60 min build.
+# ── Layer 2 — moxygen submodule ───────────────────────────────────────────────────────
+# Copy only the moxygen submodule and helper scripts.
 COPY moqt_implementation/moxygen/moxygen/ ./moqt_implementation/moxygen/moxygen/
 COPY moqt_implementation/moxygen/scripts/ ./moqt_implementation/moxygen/scripts/
 
-# ── Layer 3 — Meta OSS deps + moxygen relay (expensive, heavily cached) ──────
+# ── Layer 3 — Meta OSS deps + moxygen (BuildKit persistent cache) ────────────
 # getdeps.py fetches, patches, and compiles:
 #   folly → fizz → wangle → mvfst → proxygen → moxygen
-# On a cache hit this layer is skipped entirely.
-RUN cd /workspace/moqt_implementation/moxygen && \
+# All artefacts go into GETDEPS_CACHE which is mounted as a BuildKit
+# persistent cache volume.  This volume survives across ALL builds regardless
+# of whether earlier Dockerfile layers changed, so the 30-60 min compile is
+# paid only once (cold) and never again unless the moxygen submodule changes.
+RUN --mount=type=cache,id=moq-interop-getdeps,target=/tmp/fbcode_builder_getdeps-ZworkspaceZmoqt_implementationZmoxygenZmoxygenZbuildZfbcode_builder-root,sharing=locked \
+    cd /workspace/moqt_implementation/moxygen && \
     bash scripts/setup-deps.sh
 
 # ── Layer 4 — interop tests source (changes frequently, cheap to rebuild) ────
 COPY moq-interop_tests/ ./moq-interop_tests/
 
-# ── Layer 5 — build interop_tests binary (~1 min) ────────────────────────────
-RUN cd /workspace/moqt_implementation/moxygen && \
-    bash scripts/build.sh moxygen
-
-# ── Extract binaries to a well-known path ────────────────────────────────────
-# Query getdeps for the moxygen install dir and copy both binaries into
-# /opt/moq/bin/ so the runtime stage can reference them with a fixed path.
-RUN \
-    GETDEPS="python3 /workspace/moqt_implementation/moxygen/moxygen/build/fbcode_builder/getdeps.py" && \
-    MOXYGEN_INST=$($GETDEPS show-inst-dir moxygen 2>/dev/null | tail -1) && \
-    echo "Moxygen install dir: ${MOXYGEN_INST}" && \
-    mkdir -p /opt/moq/bin && \
-    cp "${MOXYGEN_INST}/bin/moq_relay"                         /opt/moq/bin/moq_relay    && \
-    cp /workspace/moq-interop_tests/build/bin/interop_tests    /opt/moq/bin/interop_tests && \
-    chmod +x /opt/moq/bin/moq_relay /opt/moq/bin/interop_tests && \
-    # Print shared-lib deps so they can be verified during CI.
-    echo "==> moq_relay shared libs:" && ldd /opt/moq/bin/moq_relay    || true && \
-    echo "==> interop_tests shared libs:" && ldd /opt/moq/bin/interop_tests || true
+# ── Layer 5 — build interop_tests binary and stage it ───────────────────────
+RUN --mount=type=cache,id=moq-interop-getdeps,target=/tmp/fbcode_builder_getdeps-ZworkspaceZmoqt_implementationZmoxygenZmoxygenZbuildZfbcode_builder-root,sharing=locked \
+    cd /workspace/moqt_implementation/moxygen && \
+    bash scripts/build.sh moxygen && \
+    mkdir -p /opt/moq/bin /opt/moq/lib && \
+    cp /workspace/moq-interop_tests/build/bin/interop_tests /opt/moq/bin/interop_tests && \
+    chmod +x /opt/moq/bin/interop_tests && \
+    echo "==> interop_tests shared libs (with build RPATH):" && ldd /opt/moq/bin/interop_tests || true && \
+    # Strip the build-time RPATH so the runtime image uses ldconfig / LD_LIBRARY_PATH
+    # rather than trying to open the getdeps paths that don't exist at runtime.
+    patchelf --remove-rpath /opt/moq/bin/interop_tests && \
+    echo "==> interop_tests shared libs (after RPATH removal):" && ldd /opt/moq/bin/interop_tests || true && \
+    # Explicitly stage getdeps-built shared libs that will not exist in the
+    # minimal runtime image.  getdeps builds glog/gflags as shared libraries;
+    # after removing the RPATH, ldd correctly reports them as 'not found' so
+    # the loop below picks them up.  We also cover the case by explicit pattern.
+    for pattern in "glog*/lib/libglog.so*" "gflags*/lib/libgflags.so*"; do \
+        echo "==> Staging pattern: ${pattern}"; \
+        find /tmp/fbcode_builder_getdeps-*/installed/ -path "*/${pattern}" 2>/dev/null | while read f; do \
+            dest=/opt/moq/lib/$(basename "$f"); \
+            cp -L "$f" "$dest" && echo "  copied: $f -> $dest" || true; \
+        done; \
+    done && \
+    echo "==> Staged libs:" && ls -la /opt/moq/lib/ || true
 
 # =============================================================================
 # Stage 2 — runtime
@@ -127,50 +144,26 @@ ARG DEBIAN_FRONTEND=noninteractive
 #  standard system libs and OpenSSL below.)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        # Dynamic linker requirements
         libssl3 \
         zlib1g \
         libunwind8 \
         libjemalloc2 \
-        # TLS cert generation for the relay
-        openssl \
-        # Useful for debugging inside a running container
+        liblzma5 \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the two compiled binaries from the builder stage.
-COPY --from=builder /opt/moq/bin/ /opt/moq/bin/
+COPY --from=builder /opt/moq/bin/interop_tests /opt/moq/bin/interop_tests
+# Bundle any getdeps-built shared libs the binary was dynamically linked against
+# (e.g. libglog, libgflags built with a different ABI than the system package).
+COPY --from=builder /opt/moq/lib/ /opt/moq/lib/
+# Register /opt/moq/lib in the dynamic linker cache so the binary can find
+# the bundled glog/gflags at runtime without an LD_LIBRARY_PATH override.
+RUN echo "/opt/moq/lib" > /etc/ld.so.conf.d/moq.conf && ldconfig
 
-# Copy the entrypoint script.
 COPY docker/entrypoint.sh /opt/moq/entrypoint.sh
-RUN chmod +x /opt/moq/entrypoint.sh /opt/moq/bin/moq_relay /opt/moq/bin/interop_tests
+RUN chmod +x /opt/moq/entrypoint.sh /opt/moq/bin/interop_tests
 
-# Ensure binaries are on PATH for convenience inside the container.
 ENV PATH="/opt/moq/bin:${PATH}"
 
-# Generate a self-signed TLS certificate for the relay at build time.
-# Regenerate at runtime by bind-mounting /opt/moq/certs/ or with
-# `docker run … /bin/sh -c "openssl req … && /opt/moq/entrypoint.sh relay"`.
-RUN mkdir -p /opt/moq/certs && \
-    openssl req -x509 -newkey rsa:2048 \
-        -keyout /opt/moq/certs/cert.key \
-        -out    /opt/moq/certs/cert.pem \
-        -days   3650 \
-        -nodes  \
-        -subj   "/C=US/O=moq-interop/CN=localhost" \
-    && chmod 600 /opt/moq/certs/cert.key
-
-# ── Ports ────────────────────────────────────────────────────────────────────
-# 4433 UDP — QUIC / WebTransport (primary)
-# 4433 TCP — HTTP/3 fallback
-EXPOSE 4433/udp 4433/tcp
-
-# ── Environment knobs ────────────────────────────────────────────────────────
-ENV RELAY_PORT=4433 \
-    RELAY_ENDPOINT=/moq \
-    MOQT_VERSIONS=16 \
-    GLOG_logtostderr=1
-
 ENTRYPOINT ["/opt/moq/entrypoint.sh"]
-# Default: start the relay in the background then run all interop tests.
-CMD ["all"]
+CMD ["--relay=https://localhost:4433/moq"]
