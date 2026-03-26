@@ -13,8 +13,7 @@ moqt_implementation/
 │   └── scripts/
 │       ├── setup-deps.sh       # Full first-time build (moxygen + all deps)
 │       ├── build-moxygen.sh    # Incremental rebuild of moxygen only
-│       ├── build.sh            # Top-level driver (setup → configure → compile)
-│       └── configure.sh        # CMake configure for the interop tests
+│       └── build.sh            # moxygen build driver (setup/rebuild only)
 └── README.md             # This file
 ```
 
@@ -145,5 +144,6 @@ make tests RELAY_URL=https://localhost:4433/moq
 make tests RELAY_URL=https://localhost:9668/moq-relay
 ```
 
-For local (non-Docker) builds on macOS or Linux, use `scripts/build.sh`
-directly — see the [agents guide](../../../agents.md) for the full workflow.
+For local (non-Docker) interop builds on macOS or Linux, use
+`../moq-interop_tests/scripts/build.sh` — see the
+[agents guide](../../../agents.md) for the full workflow.

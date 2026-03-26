@@ -113,7 +113,7 @@ COPY moq-interop_tests/ ./moq-interop_tests/
 # on failure the last 60 lines are printed so the actual error is always shown.
 RUN --mount=type=cache,id=moq-interop-getdeps,target=/tmp/fbcode_builder_getdeps-ZworkspaceZmoqt_implementationZmoxygenZmoxygenZbuildZfbcode_builder-root,sharing=locked \
     set -e; \
-    cd /workspace/moqt_implementation/moxygen; \
+    cd /workspace/moq-interop_tests; \
     echo "==> docker/CMakeLists.txt: $(ls /workspace/moq-interop_tests/docker/CMakeLists.txt)"; \
     bash scripts/build.sh docker > /tmp/build-docker.log 2>&1 || { echo "==> build.sh docker FAILED:"; tail -80 /tmp/build-docker.log; exit 1; }; \
     echo "==> build.sh docker succeeded. Last configure/build lines:"; \

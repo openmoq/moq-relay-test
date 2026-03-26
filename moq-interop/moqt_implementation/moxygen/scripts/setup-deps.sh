@@ -36,6 +36,20 @@ echo "==> Building moxygen + Meta OSS deps (this may take a while on first run).
 cd "$MOXYGEN_DIR"
 python3 "$GETDEPS" build --no-tests $CLEAN_FLAG moxygen
 
+# Some environments may complete the build without materializing the default
+# installed/ tree that downstream scripts query via show-inst-dir.
+MOXYGEN_INST="$(python3 "$GETDEPS" show-inst-dir moxygen 2>/dev/null | tail -1 || true)"
+if [[ -n "$MOXYGEN_INST" && ! -d "$MOXYGEN_INST" ]]; then
+  SCRATCH_DIR="$(python3 "$GETDEPS" show-scratch-dir 2>/dev/null | tail -1 || true)"
+  if [[ -n "$SCRATCH_DIR" ]]; then
+    echo "==> moxygen install dir missing at ${MOXYGEN_INST}; rebuilding with explicit install prefix..."
+    python3 "$GETDEPS" \
+      --scratch-path "$SCRATCH_DIR" \
+      --install-prefix "${SCRATCH_DIR}/installed" \
+      build --no-tests $CLEAN_FLAG moxygen
+  fi
+fi
+
 # ── Patch glog: older getdeps installs omit log_severity.h which is required
 #    by logging.h on glog >= 0.6. Inject a compatibility shim if missing.
 GLOG_INST="$(python3 "$GETDEPS" show-inst-dir glog 2>/dev/null | tail -1)"
@@ -60,4 +74,4 @@ fi
 
 echo ""
 echo "==> Done. Build moq-interop_tests with:"
-echo "    ./scripts/build.sh"
+echo "    cd ../../moq-interop_tests && bash scripts/build.sh"

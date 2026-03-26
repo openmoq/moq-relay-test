@@ -71,7 +71,7 @@ configuring or building the interop tests.
 
 ### One-step build (recommended)
 
-From `moqt_implementation/moxygen/`:
+From `moq-interop_tests/`:
 
 ```bash
 bash scripts/build.sh              # default: moxygen preset

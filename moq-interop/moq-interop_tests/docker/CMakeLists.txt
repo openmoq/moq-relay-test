@@ -65,8 +65,24 @@ file(GLOB LZ4_DIRS              ${DEPS}/lz4*)
 file(GLOB ZSTD_DIRS             ${DEPS}/zstd*)
 file(GLOB LIBSODIUM_DIRS        ${DEPS}/libsodium-*)
 file(GLOB LIBOQS_DIRS           ${DEPS}/liboqs-*)
+file(GLOB FOLLY_DIRS            ${DEPS}/folly*)
 
-find_library(FOLLY_LIB             folly            PATHS ${DEPS}/folly/lib                NO_DEFAULT_PATH REQUIRED)
+find_library(FOLLY_LIB             folly            PATHS ${DEPS}/folly/lib ${FOLLY_DIRS}/lib NO_DEFAULT_PATH)
+if(NOT FOLLY_LIB)
+    file(GLOB_RECURSE FOLLY_CANDIDATES
+        "${DEPS}/*/lib/libfolly.a"
+        "${DEPS}/*/lib/libfolly.so"
+        "${DEPS}/*/lib/libfolly.so.*")
+    list(LENGTH FOLLY_CANDIDATES FOLLY_CANDIDATE_COUNT)
+    if(FOLLY_CANDIDATE_COUNT GREATER 0)
+        list(GET FOLLY_CANDIDATES 0 FOLLY_LIB)
+        message(STATUS "Falling back to discovered folly library: ${FOLLY_LIB}")
+    else()
+        message(FATAL_ERROR
+            "Could not locate folly library under ${DEPS}. "
+            "Expected ${DEPS}/folly/lib/libfolly.* or equivalent getdeps layout.")
+    endif()
+endif()
 find_library(GLOG_LIB              glog             PATHS ${GLOG_DIR}/lib                  NO_DEFAULT_PATH REQUIRED)
 find_library(GFLAGS_LIB            gflags           PATHS ${GFLAGS_DIR}/lib                NO_DEFAULT_PATH REQUIRED)
 find_library(FMT_LIB               fmt              PATHS ${FMT_DIR}/lib                   NO_DEFAULT_PATH REQUIRED)
