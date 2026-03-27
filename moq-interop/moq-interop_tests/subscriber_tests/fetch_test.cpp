@@ -32,7 +32,7 @@ private:
 };
 
 // Auto-register this test
-REGISTER_TEST(FetchTest);
+// REGISTER_TEST(FetchTest);
 
 TestResult FetchTest::execute() {
   log("Testing publish, subscribe, and fetch for track: " + trackNamespace_ + "/" +

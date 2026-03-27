@@ -6,27 +6,34 @@
 # is available — no local C++ toolchain required.
 #
 # Targets
-#   build     Build (or rebuild) the moq-interop Docker image.
-#   tests     Run the interop tests against RELAY_URL.
-#   shell     Open an interactive shell inside the container.
-#   clean     Remove the local Docker image.
-#   push      Tag and push the image to REGISTRY/IMAGE:TAG.
-#   help      Print this help text.
+#   build        Build (or rebuild) the moq-interop Docker image.
+#   tests        Run the interop tests against RELAY_URL.
+#   conformance  Run moxygen moqtest conformance tests against CONFORMANCE_URL.
+#   shell        Open an interactive shell inside the container.
+#   clean        Remove the local Docker image.
+#   push         Tag and push the image to REGISTRY/IMAGE:TAG.
+#   help         Print this help text.
 #
 # Common variables (override on the command line)
-#   IMAGE        Local image name              (default: moq-interop)
-#   TAG          Image tag                     (default: latest)
-#   REGISTRY     Registry prefix               (default: empty)
-#   RELAY_URL    Relay URL used by 'tests'     (default: https://localhost:4433/moq)
-#   TESTS_ARGS   Extra flags for interop_tests (default: empty)
+#   IMAGE             Local image name                   (default: moq-interop)
+#   TAG               Image tag                          (default: latest)
+#   REGISTRY          Registry prefix                    (default: empty)
+#   RELAY_URL         Relay URL used by 'tests'          (default: https://localhost:4433/moq)
+#   TESTS_ARGS        Extra flags for interop_tests      (default: empty)
+#   WITH_CONFORMANCE  Include conformance tooling (0/1)  (default: 1)
+#   CONFORMANCE_URL   Relay URL used by 'conformance'    (default: http://localhost:9999)
+#   CONFORMANCE_ARGS  Extra args for conformance_test.sh (default: empty)
 #
 # Examples
 #   make build
 #   make tests RELAY_URL=https://relay.example.com:4433/moq
 #   make tests RELAY_URL=https://localhost:9668/moq-relay   # localhost auto-rewritten
 #   make tests TESTS_ARGS="--categories=Publisher,Subscriber"
+#   make conformance CONFORMANCE_URL=http://relay.example.com:9999
+#   make conformance CONFORMANCE_ARGS="16"                  # restrict to MoQT version 16
+#   make build WITH_CONFORMANCE=0                           # omit conformance tooling
 #   make push  REGISTRY=ghcr.io/myorg TAG=v1.2.3
-#   make build DOCKER_BUILD_FLAGS="--progress=plain"   # verbose build log
+#   make build DOCKER_BUILD_FLAGS="--progress=plain"        # verbose build log
 # =============================================================================
 
 # ── Image coordinates ────────────────────────────────────────────────────────────────────────────
@@ -50,6 +57,15 @@ TESTS_ARGS  ?=
 # makes it work on Linux as well.
 RELAY_URL_DOCKER := $(subst 127.0.0.1,host.docker.internal,$(subst localhost,host.docker.internal,$(RELAY_URL)))
 
+# ── Conformance test parameters ───────────────────────────────────────────────────────
+# WITH_CONFORMANCE=1 (default) stages moqtest_client + conformance_test.sh in
+# the image.  Set to 0 to build a smaller image without conformance tooling.
+WITH_CONFORMANCE  ?= 1
+CONFORMANCE_URL   ?= http://localhost:9999
+CONFORMANCE_ARGS  ?=
+
+CONFORMANCE_URL_DOCKER := $(subst 127.0.0.1,host.docker.internal,$(subst localhost,host.docker.internal,$(CONFORMANCE_URL)))
+
 # ── Build parameters ────────────────────────────────────────────────────────────────────────────
 # Auto-detect CPU count from the host so getdeps can parallelise its build.
 NPROC := $(shell nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
@@ -69,7 +85,7 @@ DOCKER := docker
 export DOCKER_BUILDKIT := 1
 
 # ── Phony declarations ────────────────────────────────────────────────────────────────────────
-.PHONY: all build tests shell clean push help
+.PHONY: all build tests conformance shell clean push help
 
 all: tests
 
@@ -81,6 +97,7 @@ build:
 	$(DOCKER) build \
 		$(DOCKER_BUILD_FLAGS) \
 		--build-arg NPROC=$(NPROC) \
+		--build-arg WITH_CONFORMANCE=$(WITH_CONFORMANCE) \
 		-t $(IMAGE_REF) \
 		-f $(DOCKERFILE) \
 		$(BUILD_CTX)
@@ -112,28 +129,52 @@ clean:
 push: build
 	$(DOCKER) push $(IMAGE_REF)
 
+# ── conformance ───────────────────────────────────────────────────────────────────────────────
+# Runs moxygen's conformance_test.sh against CONFORMANCE_URL.
+# The image must have been built with WITH_CONFORMANCE=1 (the default).
+# The relay/server must already be running before invoking this target.
+conformance: build
+	@if [ "$(WITH_CONFORMANCE)" = "0" ]; then \
+		echo "Error: image built without conformance tooling (WITH_CONFORMANCE=0)." >&2; \
+		echo "  Rebuild with: make build WITH_CONFORMANCE=1" >&2; \
+		exit 1; \
+	fi
+	$(DOCKER) run --rm \
+		--name moq-interop-conformance \
+		--add-host=host.docker.internal:host-gateway \
+		--entrypoint /opt/moq/conformance/run_conformance.sh \
+		$(IMAGE_REF) $(CONFORMANCE_URL_DOCKER) $(CONFORMANCE_ARGS)
+
 # ── help ──────────────────────────────────────────────────────────────────────────────────────
 help:
 	@printf '\nmoq-interop — available make targets\n\n'
-	@printf '  %-12s  %s\n' build  'Build (or rebuild) the Docker image'
-	@printf '  %-12s  %s\n' tests  'Run the interop tests against RELAY_URL'
-	@printf '  %-12s  %s\n' shell  'Open an interactive shell in the container'
-	@printf '  %-12s  %s\n' clean  'Remove the local Docker image'
-	@printf '  %-12s  %s\n' push   'Push the image to REGISTRY/IMAGE:TAG'
+	@printf '  %-14s  %s\n' build        'Build (or rebuild) the Docker image'
+	@printf '  %-14s  %s\n' tests        'Run the interop tests against RELAY_URL'
+	@printf '  %-14s  %s\n' conformance  'Run moxygen moqtest conformance tests against CONFORMANCE_URL'
+	@printf '  %-14s  %s\n' shell        'Open an interactive shell in the container'
+	@printf '  %-14s  %s\n' clean        'Remove the local Docker image'
+	@printf '  %-14s  %s\n' push         'Push the image to REGISTRY/IMAGE:TAG'
 	@printf '\nCurrent variable values\n\n'
-	@printf '  %-22s  %s\n' IMAGE             '$(IMAGE)'
-	@printf '  %-22s  %s\n' TAG               '$(TAG)'
-	@printf '  %-22s  %s\n' REGISTRY          '$(if $(REGISTRY),$(REGISTRY),(none — local only))'
-	@printf '  %-22s  %s\n' IMAGE_REF         '$(IMAGE_REF)'
-	@printf '  %-22s  %s\n' RELAY_URL         '$(RELAY_URL)'
-	@printf '  %-22s  %s\n' RELAY_URL_DOCKER  '$(RELAY_URL_DOCKER) (used inside container)'
-	@printf '  %-22s  %s\n' TESTS_ARGS        '$(if $(TESTS_ARGS),$(TESTS_ARGS),(none))'
-	@printf '  %-22s  %s\n' NPROC             '$(NPROC)'
+	@printf '  %-28s  %s\n' IMAGE                  '$(IMAGE)'
+	@printf '  %-28s  %s\n' TAG                    '$(TAG)'
+	@printf '  %-28s  %s\n' REGISTRY               '$(if $(REGISTRY),$(REGISTRY),(none — local only))'
+	@printf '  %-28s  %s\n' IMAGE_REF              '$(IMAGE_REF)'
+	@printf '  %-28s  %s\n' RELAY_URL              '$(RELAY_URL)'
+	@printf '  %-28s  %s\n' RELAY_URL_DOCKER       '$(RELAY_URL_DOCKER) (used inside container)'
+	@printf '  %-28s  %s\n' TESTS_ARGS             '$(if $(TESTS_ARGS),$(TESTS_ARGS),(none))'
+	@printf '  %-28s  %s\n' WITH_CONFORMANCE       '$(WITH_CONFORMANCE)'
+	@printf '  %-28s  %s\n' CONFORMANCE_URL        '$(CONFORMANCE_URL)'
+	@printf '  %-28s  %s\n' CONFORMANCE_URL_DOCKER '$(CONFORMANCE_URL_DOCKER) (used inside container)'
+	@printf '  %-28s  %s\n' CONFORMANCE_ARGS       '$(if $(CONFORMANCE_ARGS),$(CONFORMANCE_ARGS),(none))'
+	@printf '  %-28s  %s\n' NPROC                  '$(NPROC)'
 	@printf '\nExamples\n\n'
 	@printf '  make build\n'
 	@printf '  make tests RELAY_URL=https://relay.example.com:4433/moq\n'
 	@printf '  make tests RELAY_URL=https://localhost:9668/moq-relay\n'
 	@printf '  make tests TESTS_ARGS="--categories=Publisher,Subscriber"\n'
+	@printf '  make conformance CONFORMANCE_URL=http://relay.example.com:9999\n'
+	@printf '  make conformance CONFORMANCE_ARGS="16"\n'
+	@printf '  make build WITH_CONFORMANCE=0\n'
 	@printf '  make push  REGISTRY=ghcr.io/myorg TAG=v1.2.3\n'
 	@printf '  make build DOCKER_BUILD_FLAGS="--progress=plain"\n'
 	@printf '\n'
