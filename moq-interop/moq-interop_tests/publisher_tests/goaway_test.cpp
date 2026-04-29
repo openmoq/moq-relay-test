@@ -44,7 +44,7 @@ TestResult GoawayTest::execute() {
 
   // Execute goaway sequence (publishes a dummy track and sends goaway)
   log("Sending goaway sequence...");
-  bool goawayResult = publisher->goaway_sequence();
+  bool goawayResult = publisher->goawaySequence();
 
   // Verify goaway sequence succeeded
   assertTrue(goawayResult, "Goaway sequence should succeed");

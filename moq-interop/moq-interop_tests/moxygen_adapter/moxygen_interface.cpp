@@ -1,4 +1,5 @@
 #include "moxygen_interface.h"
+#include <glog/logging.h>
 #include "moxygen_mocks.h"
 #include "type_conversions.h"
 #include <folly/futures/Future.h>
@@ -27,7 +28,6 @@ MoxygenInterface::~MoxygenInterface() {
   // Destroy QUIC-owned objects on the EventBase thread first, then drop the
   // executor (which just wraps the EventBase pointer and is safe to reset from
   // any thread).
-  // resetClientOnEventBase();
   executor_.reset();
 }
 
@@ -64,43 +64,43 @@ bool MoxygenInterface::connect(
     std::chrono::milliseconds transactionTimeout, bool useInsecureVerifier) {
   
   try {
-    std::cout << "[connect] Starting connection to " << url << std::endl;
+    LOG(INFO) << "[connect] Starting connection to " << url;
 
     // blockingWait must NOT be called from the EventBase thread as the
     // coroutine relies on the EventBase to drive I/O completions.
     if (eventBase_->isInEventBaseThread()) {
-      std::cerr << "[connect] FATAL: connect() called from EventBase thread - "
-                   "blockingWait would deadlock!" << std::endl;
+      LOG(ERROR) << "[connect] FATAL: connect() called from EventBase thread - "
+                   "blockingWait would deadlock!";
       return false;
     }
 
     // Create executor from the provided event base and store as member
     executor_ = std::make_shared<moxygen::MoQFollyExecutorImpl>(eventBase_);
-    std::cout << "[connect] Created MoQFollyExecutorImpl" << std::endl;
+    LOG(INFO) << "[connect] Created MoQFollyExecutorImpl";
 
     proxygen::URL parsedUrl(url);
     if (!parsedUrl.isValid()) {
-      std::cerr << "Invalid URL: " << url << std::endl;
+      LOG(ERROR) << "Invalid URL: " << url;
       return false;
     }
-    std::cout << "[connect] URL parsed successfully" << std::endl;
+    LOG(INFO) << "[connect] URL parsed successfully";
 
     std::shared_ptr<fizz::CertificateVerifier> verifier = nullptr;
     if (useInsecureVerifier) {
       verifier = std::make_shared<fizz::InsecureAcceptAnyCertificate>();
-      std::cout << "[connect] Using insecure certificate verifier" << std::endl;
+      LOG(INFO) << "[connect] Using insecure certificate verifier";
     }
 
     // Create MoQ client with MoQRelaySession factory for announcement support
     auto sessionFactory = moxygen::MoQRelaySession::createRelaySessionFactory();
-    std::cout << "[connect] Created relay session factory" << std::endl;
+    LOG(INFO) << "[connect] Created relay session factory";
     
     client_ = std::make_shared<moxygen::MoQClient>(
         executor_,
         std::move(parsedUrl),
         std::move(sessionFactory),
         verifier);
-    std::cout << "[connect] Created MoQClient" << std::endl;
+    LOG(INFO) << "[connect] Created MoQClient";
 
     // Set up MoQ session synchronously using blockingWait.
     // NOTE: setupMoQSession internally uses EventBaseThreadTimekeeper in
@@ -117,17 +117,17 @@ bool MoxygenInterface::connect(
     relaySession_ = std::dynamic_pointer_cast<moxygen::MoQRelaySession>(
         client_->moqSession_);
     if (!relaySession_) {
-      std::cerr << "Failed to cast to MoQRelaySession" << std::endl;
+      LOG(ERROR) << "Failed to cast to MoQRelaySession";
       client_.reset();
       return false;
     }
-    std::cout << "[connect] Cast successful" << std::endl;
+    LOG(INFO) << "[connect] Cast successful";
 
-    std::cout << "MoQ session established successfully" << std::endl;
+    LOG(INFO) << "MoQ session established successfully";
     return true;
 
   } catch (const std::exception &ex) {
-    std::cerr << "Failed to establish MoQ session: " << ex.what() << std::endl;
+    LOG(ERROR) << "Failed to establish MoQ session: " << ex.what();
     resetClientOnEventBase();
     return false;
   }
@@ -139,7 +139,7 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
 
   try {
     if (!isConnected()) {
-      std::cerr << "No MoQ session available" << std::endl;
+      LOG(ERROR) << "No MoQ session available";
       co_return false;
     }
     // Session is connected
@@ -175,7 +175,7 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
       if (subscriptionHandle_) {
         subscriptionHandle_->setTrackConsumer(publishTrackConsumer_);
       } else {
-        std::cerr << "ERROR: subscriptionHandle_ is null" << std::endl;
+        LOG(ERROR) << "ERROR: subscriptionHandle_ is null";
         co_return false;
       }
 
@@ -184,13 +184,13 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
       auto replyResultTry = co_await folly::coro::co_awaitTry(std::move(publishConsumerAndReply.reply));
       
       if (replyResultTry.hasException()) {
-        std::cerr << "ERROR: Exception waiting for publish reply" << std::endl;
+        LOG(ERROR) << "ERROR: Exception waiting for publish reply";
         co_return false;
       }
       
       // Check if reply had an error (PUBLISH_ERROR response from relay)
       if (replyResultTry->hasError()) {
-        std::cerr << "ERROR: Publish was rejected by relay" << std::endl;
+        LOG(ERROR) << "ERROR: Publish was rejected by relay";
         co_return false;
       }
       
@@ -204,12 +204,11 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
       co_return true;
     } else {
       auto error = publishResult.error();
-      std::cerr << "ERROR: Publish request failed: " << error.reasonPhrase
-                << std::endl;
+      LOG(ERROR) << "ERROR: Publish request failed: " << error.reasonPhrase;
       co_return false;
     }
   } catch (const std::exception &ex) {
-    std::cerr << "[_doPublish] EXCEPTION: " << ex.what() << std::endl;
+    LOG(ERROR) << "[_doPublish] EXCEPTION: " << ex.what();
     publishTrackConsumer_.reset();
     co_return false;
   }
@@ -241,8 +240,8 @@ folly::coro::Task<moxygen::MoQRelaySession::SubscribeResult> MoxygenInterface::_
                                .trackName = trackName},
         priority, groupOrder);
 
-    std::cout << "Sending subscribe request for track: " << trackNamespace
-              << "/" << trackName << std::endl;
+    LOG(INFO) << "Sending subscribe request for track: " << trackNamespace
+              << "/" << trackName;
 
     std::shared_ptr<MockTrackConsumer> trackConsumer = std::make_shared<MockTrackConsumer>();
 
@@ -260,7 +259,7 @@ bool MoxygenInterface::subscribe(
 
   try {
     if (!isConnected()) {
-      std::cerr << "No MoQ session available" << std::endl;
+      LOG(ERROR) << "No MoQ session available";
       return false;
     }
 
@@ -276,18 +275,17 @@ bool MoxygenInterface::subscribe(
 
     if (subscribeResult.hasValue()) {
       auto subscriptionHandle = std::move(subscribeResult.value());
-      std::cout << "Subscribe OK received. Track alias: "
-                << subscriptionHandle->subscribeOk().trackAlias.value
-                << std::endl;
+      LOG(INFO) << "Subscribe OK received. Track alias: "
+                << subscriptionHandle->subscribeOk().trackAlias.value;
       return true;
     } else {
       auto error = subscribeResult.error();
-      std::cerr << "Subscribe failed: " << error.reasonPhrase << std::endl;
+      LOG(ERROR) << "Subscribe failed: " << error.reasonPhrase;
       subscriptionHandle_.reset();
       return false;
     }
   } catch (const std::exception &ex) {
-    std::cerr << "Exception in subscribe: " << ex.what() << std::endl;
+    LOG(ERROR) << "Exception in subscribe: " << ex.what();
     subscriptionHandle_.reset();
     return false;
   }
@@ -303,7 +301,7 @@ bool MoxygenInterface::subscribeUpdate(
 ) {
   try {
     if (!isConnected() || !relaySession_) {
-      std::cerr << "No MoQ relay session available" << std::endl;
+      LOG(ERROR) << "No MoQ relay session available";
       return false;
     }
 
@@ -315,8 +313,7 @@ bool MoxygenInterface::subscribeUpdate(
 
     if (!subscribeResult.hasValue()) {
       auto error = subscribeResult.error();
-      std::cerr << "Subscribe failed before subscribe update: " << error.reasonPhrase
-                << std::endl;
+      LOG(ERROR) << "Subscribe failed before subscribe update: " << error.reasonPhrase;
       return false;
     }
     auto subscriptionHandle = std::move(subscribeResult.value());
@@ -342,22 +339,22 @@ bool MoxygenInterface::subscribeUpdate(
     subscribeUpdate.priority = priority;
     subscribeUpdate.forward = true;
 
-    std::cout << "Sending subscribe update request" << std::endl;
+    LOG(INFO) << "Sending subscribe update request";
     auto result = folly::coro::blockingWait(
         subscriptionHandle->requestUpdate(subscribeUpdate)
             .scheduleOn(eventBase_)
             .start());
-    std::cout << "Subscribe update sent successfully" << std::endl;
+    LOG(INFO) << "Subscribe update sent successfully";
     if (!result.hasValue()) {
       auto error = result.error();
-      std::cerr << "Subscribe update failed: " << error.reasonPhrase << std::endl;
+      LOG(ERROR) << "Subscribe update failed: " << error.reasonPhrase;
       return false;
     } else {
-      std::cout << "Subscribe update succeeded" << std::endl;
+      LOG(INFO) << "Subscribe update succeeded";
       return true;
     }
   } catch (const std::exception &ex) {
-    std::cerr << "Exception in subscribe update: " << ex.what() << std::endl;
+    LOG(ERROR) << "Exception in subscribe update: " << ex.what();
     return false;
   }
 } 
@@ -366,7 +363,7 @@ bool MoxygenInterface::subscribeUpdate(
 bool MoxygenInterface::fetch(const std::string &trackNamespace, const std::string &trackName) {
   try {
     if (!isConnected() || !relaySession_) {
-      std::cerr << "No MoQ relay session available" << std::endl;
+      LOG(ERROR) << "No MoQ relay session available";
       return false;
     }
 
@@ -382,8 +379,8 @@ bool MoxygenInterface::fetch(const std::string &trackNamespace, const std::strin
         moxygen::GroupOrder::OldestFirst  // groupOrder
     );
     
-    std::cout << "Sending fetch request for track: " << trackNamespace << "/"
-              << trackName << std::endl;
+    LOG(INFO) << "Sending fetch request for track: " << trackNamespace << "/"
+              << trackName;
     
     // Create and store fetch consumer to keep it alive for async callbacks
     fetchConsumer_ = std::make_shared<MockFetchConsumer>();
@@ -394,16 +391,16 @@ bool MoxygenInterface::fetch(const std::string &trackNamespace, const std::strin
             .start());
     if (fetchResult.hasValue()) {
       auto fetchHandle = fetchResult.value();
-      std::cout << "Fetch OK received." << std::endl;
+      LOG(INFO) << "Fetch OK received.";
       return true;
     } else {
       auto error = fetchResult.error();
-      std::cerr << "Fetch failed: " << error.reasonPhrase << std::endl;
+      LOG(ERROR) << "Fetch failed: " << error.reasonPhrase;
       fetchConsumer_.reset();
       return false;
     }
   } catch (const std::exception &ex) {
-    std::cerr << "Exception in fetch: " << ex.what() << std::endl;
+    LOG(ERROR) << "Exception in fetch: " << ex.what();
     fetchConsumer_.reset();
     return false;
   }
@@ -417,17 +414,16 @@ MoxygenInterface::_doPublishNamespace(const std::string &trackNamespace) {
   publishNamespace.trackNamespace =
       moxygen::TrackNamespace(std::vector<std::string>{trackNamespace});
 
-  std::cout << "Sending publishNamespace request for namespace: " << trackNamespace
-            << std::endl;
+  LOG(INFO) << "Sending publishNamespace request for namespace: " << trackNamespace;
 
   co_return co_await relaySession_->publishNamespace(publishNamespace);
 }
 
 bool
-MoxygenInterface::publish_namespace(const std::string &trackNamespace) {
+MoxygenInterface::publishNamespace(const std::string &trackNamespace) {
   try {
     if (!isConnected() || !relaySession_) {
-      std::cerr << "No MoQ relay session available" << std::endl;
+      LOG(ERROR) << "No MoQ relay session available";
       return false;
     }
 
@@ -438,25 +434,24 @@ MoxygenInterface::publish_namespace(const std::string &trackNamespace) {
 
     if (publishNamespaceResult.hasValue()) {
       auto publishNamespaceHandle = std::move(publishNamespaceResult.value());
-      std::cout << "PublishNamespace OK received for namespace: " << trackNamespace
-                << std::endl;
+      LOG(INFO) << "PublishNamespace OK received for namespace: " << trackNamespace;
       return true;
     } else {
       auto error = publishNamespaceResult.error();
-      std::cerr << "PublishNamespace failed: " << error.reasonPhrase << std::endl;
+      LOG(ERROR) << "PublishNamespace failed: " << error.reasonPhrase;
       return false;
     }
   } catch (const std::exception &ex) {
-    std::cerr << "Exception in publish_namespace: " << ex.what() << std::endl;
+    LOG(ERROR) << "Exception in publishNamespace: " << ex.what();
     return false;
   }
 }
 
 bool
-MoxygenInterface::publish_namespace_done(const std::string &trackNamespace) {
+MoxygenInterface::publishNamespaceDone(const std::string &trackNamespace) {
   try {
     if (!isConnected() || !relaySession_) {
-      std::cerr << "No MoQ relay session available" << std::endl;
+      LOG(ERROR) << "No MoQ relay session available";
       return false;
     }
 
@@ -467,30 +462,28 @@ MoxygenInterface::publish_namespace_done(const std::string &trackNamespace) {
           .start());
     if (!publishNamespaceResult.hasValue()) {
       auto error = publishNamespaceResult.error();
-      std::cerr << "PublishNamespace failed before publishNamespaceDone: " << error.reasonPhrase
-                << std::endl;
+      LOG(ERROR) << "PublishNamespace failed before publishNamespaceDone: " << error.reasonPhrase;
       return false;
     }
 
     auto publishNamespaceHandle_ = std::move(publishNamespaceResult.value());
 
-    std::cout << "Sending publishNamespaceDone request for namespace: " << trackNamespace
-              << std::endl;
+    LOG(INFO) << "Sending publishNamespaceDone request for namespace: " << trackNamespace;
     // Send publishNamespaceDone request
     publishNamespaceHandle_->publishNamespaceDone();
     return true;
 
   } catch (const std::exception &ex) {
-    std::cerr << "Exception in publish_namespace_done: " << ex.what() << std::endl;
+    LOG(ERROR) << "Exception in publishNamespaceDone: " << ex.what();
     return false;
   }
 }
 
 bool
-MoxygenInterface::subscribe_namespace(const std::string &trackNamespace) {
+MoxygenInterface::subscribeNamespace(const std::string &trackNamespace) {
   try {
     if (!isConnected() || !relaySession_) {
-      std::cerr << "No MoQ relay session available" << std::endl;
+      LOG(ERROR) << "No MoQ relay session available";
       return false;
     }
 
@@ -507,17 +500,16 @@ MoxygenInterface::subscribe_namespace(const std::string &trackNamespace) {
 
     if (!subscribeNamespaceResult_.hasValue()) {
       auto error = subscribeNamespaceResult_.error();
-      std::cerr << "Subscribe namespace failed: " << error.reasonPhrase
-                << std::endl;
+      LOG(ERROR) << "Subscribe namespace failed: " << error.reasonPhrase;
       return false;
     } else {
-      std::cout << "Subscribe namespace succeeded for namespace: "
-                << trackNamespace << std::endl;
+      LOG(INFO) << "Subscribe namespace succeeded for namespace: "
+                << trackNamespace;
       return true;
     }
 
   } catch (const std::exception &ex) {
-    std::cerr << "Exception in subscribe_namespace: " << ex.what() << std::endl;
+    LOG(ERROR) << "Exception in subscribeNamespace: " << ex.what();
     return false;
   }
 }
@@ -527,7 +519,7 @@ MoxygenInterface::trackStatus(const std::string &trackNamespace,
                               const std::string &trackName) {
   try {
     if (!isConnected() || !relaySession_) {
-      std::cerr << "No MoQ relay session available" << std::endl;
+      LOG(ERROR) << "No MoQ relay session available";
       return false;
     }
 
@@ -549,16 +541,16 @@ MoxygenInterface::trackStatus(const std::string &trackNamespace,
 
     if (result.hasValue()) {
       auto trackStatusOk = result.value();
-      std::cout << "Track Status OK received for track: " << trackNamespace
-                << "/" << trackName << std::endl;
+      LOG(INFO) << "Track Status OK received for track: " << trackNamespace
+                << "/" << trackName;
       return true;
     } else {
       auto error = result.error();
-      std::cerr << "Track Status failed: " << error.reasonPhrase << std::endl;
+      LOG(ERROR) << "Track Status failed: " << error.reasonPhrase;
       return false;
     }
   } catch (const std::exception &ex) {
-    std::cerr << "Exception in trackStatus: " << ex.what() << std::endl;
+    LOG(ERROR) << "Exception in trackStatus: " << ex.what();
     return false;
   }
 }
@@ -566,11 +558,11 @@ MoxygenInterface::trackStatus(const std::string &trackNamespace,
 bool MoxygenInterface::goaway() {
   try {
     if (!isConnected() || !relaySession_) {
-      std::cerr << "No MoQ relay session available" << std::endl;
+      LOG(ERROR) << "No MoQ relay session available";
       return false;
     }
 
-    std::cout << "Sending goaway after publish" << std::endl;
+    LOG(INFO) << "Sending goaway after publish";
     moxygen::Goaway goaway_inp{.newSessionUri = ""};
 
     // goaway() writes to the non-thread-safe controlWriteBuf_;
@@ -578,38 +570,38 @@ bool MoxygenInterface::goaway() {
     auto session = relaySession_;
     eventBase_->runInEventBaseThreadAndWait(
         [session, goaway_inp]() mutable { session->goaway(goaway_inp); });
-    std::cout << "Goaway sent successfully" << std::endl;
+    LOG(INFO) << "Goaway sent successfully";
 
     return true;
   } catch (const std::exception &ex) {
-    std::cerr << "Exception in goaway: " << ex.what() << std::endl;
+    LOG(ERROR) << "Exception in goaway: " << ex.what();
     return false;
   }
 }
 
-bool MoxygenInterface::goaway_sequence() {
+bool MoxygenInterface::goawaySequence() {
   try {
     if (!isConnected() || !relaySession_) {
-      std::cerr << "No MoQ relay session available" << std::endl;
+      LOG(ERROR) << "No MoQ relay session available";
       return false;
     }
 
     // First, publish with a dummy track name
-    std::cout << "Publishing dummy track before goaway" << std::endl;
+    LOG(INFO) << "Publishing dummy track before goaway";
     auto subscriptionHandle_ = std::make_shared<MockSubscriptionHandle>();
     bool publishSuccess = folly::coro::blockingWait(
       _doPublish("dummy_namespace", "dummy_track", subscriptionHandle_)
           .scheduleOn(eventBase_)
           .start());
     if (!publishSuccess) {
-      std::cerr << "Failed to publish dummy track" << std::endl;
+      LOG(ERROR) << "Failed to publish dummy track";
       return false;
     }
 
     // Then, send goaway
     bool goawaySuccess = goaway();
     if (!goawaySuccess) {
-      std::cerr << "Failed to send goaway" << std::endl;
+      LOG(ERROR) << "Failed to send goaway";
       return false;
     }
 
@@ -617,10 +609,10 @@ bool MoxygenInterface::goaway_sequence() {
     // This prevents a race condition where the relay closes the session
     // while we're still trying to clean it up in tearDown().
     // Using blockingWait on a small sleep to allow event base processing.
-    std::cout << "Waiting for goaway to be processed..." << std::endl;
+    LOG(INFO) << "Waiting for goaway to be processed...";
     folly::coro::blockingWait(folly::coro::sleep(std::chrono::milliseconds(100)));
 
-    std::cout << "Goaway sequence completed successfully" << std::endl;
+    LOG(INFO) << "Goaway sequence completed successfully";
 
     // After goaway, the session may close immediately, so we can't reliably
     // check if unsubscribe was called. Just return success if goaway sent.
@@ -629,7 +621,7 @@ bool MoxygenInterface::goaway_sequence() {
     return true;
 
   } catch (const std::exception &ex) {
-    std::cerr << "Exception in goaway_sequence: " << ex.what() << std::endl;
+    LOG(ERROR) << "Exception in goawaySequence: " << ex.what();
     return false;
   }
 }
@@ -638,7 +630,7 @@ bool
 MoxygenInterface::setMaxConcurrentRequests(uint32_t maxConcurrentRequests) {
   try {
     if (!isConnected() || !relaySession_) {
-      std::cerr << "No MoQ relay session available" << std::endl;
+      LOG(ERROR) << "No MoQ relay session available";
       return false;
     }
 
@@ -649,13 +641,11 @@ MoxygenInterface::setMaxConcurrentRequests(uint32_t maxConcurrentRequests) {
         [session, maxConcurrentRequests]() {
           session->setMaxConcurrentRequests(maxConcurrentRequests);
         });
-    std::cout << "Set max concurrent requests to: " << maxConcurrentRequests
-              << std::endl;
+    LOG(INFO) << "Set max concurrent requests to: " << maxConcurrentRequests;
     return true;
 
   } catch (const std::exception &ex) {
-    std::cerr << "Exception in setMaxConcurrentRequests: " << ex.what()
-              << std::endl;
+    LOG(ERROR) << "Exception in setMaxConcurrentRequests: " << ex.what();
     return false;
   }
 }

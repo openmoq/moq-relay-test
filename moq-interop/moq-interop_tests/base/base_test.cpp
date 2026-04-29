@@ -1,4 +1,5 @@
 #include "base_test.h"
+#include <glog/logging.h>
 #include <iostream>
 
 namespace interop_test {
@@ -54,8 +55,7 @@ TestResult BaseTest::run() {
         fixture_->tearDown();
       }
     } catch (const std::exception &teardownEx) {
-      std::cerr << "Exception during teardown: " << teardownEx.what()
-                << std::endl;
+      LOG(ERROR) << "Exception during teardown: " << teardownEx.what();
     }
 
     setError(std::string("Exception: ") + ex.what());

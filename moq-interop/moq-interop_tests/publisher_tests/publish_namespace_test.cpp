@@ -39,7 +39,7 @@ TestResult PublishNamespaceTest::execute() {
 
   // Send announce request
   log("Sending announce request...");
-  bool announceResult = publisher->publish_namespace(trackNamespace_);
+  bool announceResult = publisher->publishNamespace(trackNamespace_);
 
   // Verify announce succeeded
   assertTrue(announceResult, "Announce request should succeed");

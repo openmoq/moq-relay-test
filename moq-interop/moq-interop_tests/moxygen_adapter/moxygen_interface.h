@@ -85,7 +85,7 @@ public:
    * @param trackNamespace The namespace to announce (e.g., "video/conference")
    * @return true on success
    */
-  bool publish_namespace(const std::string &trackNamespace) override;
+  bool publishNamespace(const std::string &trackNamespace) override;
 
   /**
    * Signals publish done for a namespace to the MoQ relay
@@ -93,14 +93,14 @@ public:
    * "video/conference")
    * @return true on success
    */
-  bool publish_namespace_done(const std::string &trackNamespace) override;
+  bool publishNamespaceDone(const std::string &trackNamespace) override;
 
   /**
    * Subscribes to announces for a given namespace prefix
    * @param trackNamespace The namespace prefix to subscribe to (e.g., "video/")
    * @return true on success
    */
-  bool subscribe_namespace(const std::string &trackNamespace) override;
+  bool subscribeNamespace(const std::string &trackNamespace) override;
 
   /**
    * Sends a track status request to the MoQ relay
@@ -121,7 +121,7 @@ public:
    * Sends a goaway signal after publishing a dummy track
    * @return true on success
    */
-  bool goaway_sequence() override;
+  bool goawaySequence() override;
 
   bool
   setMaxConcurrentRequests(uint32_t maxConcurrentRequests) override;

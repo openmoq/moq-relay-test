@@ -37,8 +37,8 @@ private:
   std::string trackName_{"interop-track"};
 };
 
-// Auto-register this test
-// This leads to segmentation fault in the test moxygen relay. Will enable after fixing the issue.
+// Disabled: triggers segmentation fault in the test moxygen relay.
+// Re-enable after the relay issue is fixed.
 // REGISTER_TEST(SubscribeUpdateErrorTest);
 
 TestResult SubscribeUpdateErrorTest::execute() {

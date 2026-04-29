@@ -1,10 +1,25 @@
 #include "moxygen_mocks.h"
+#include <glog/logging.h>
 
 #include <folly/io/async/EventBase.h>
 #include <folly/executors/GlobalExecutor.h>
 #include <iostream>
 
 namespace interop_test {
+
+// ============================================================================
+// makeMockData
+// ============================================================================
+std::unique_ptr<folly::IOBuf> makeMockData(uint32_t size) {
+  auto buf = folly::IOBuf::create(size);
+  buf->append(size);
+  // Fill with pattern for debugging
+  auto data = buf->writableData();
+  for (uint32_t i = 0; i < size; ++i) {
+    data[i] = static_cast<uint8_t>('A' + (i % 26));
+  }
+  return buf;
+}
 
 // ============================================================================
 // MockSubscriptionHandle implementations
@@ -19,22 +34,20 @@ MockSubscriptionHandle::MockSubscriptionHandle(
       trackConsumer_(std::move(consumer)) {}
 
 void MockSubscriptionHandle::unsubscribe() {
-  std::cout << "MockSubscriptionHandle::unsubscribe() called" << std::endl;
+  LOG(INFO) << "MockSubscriptionHandle::unsubscribe() called";
   unsubscribe_called_ = true;
 }
 
 folly::coro::Task<moxygen::SubscriptionHandle::RequestUpdateResult>
 MockSubscriptionHandle::requestUpdate(moxygen::RequestUpdate reqUpdate) {
-  std::cout
+  LOG(INFO)
       << "MockSubscriptionHandle::requestUpdate() called with request ID: "
       << reqUpdate.requestID
-      << ", forward: " << (reqUpdate.forward ? "true" : "false")
-      << std::endl;
+      << ", forward: " << (reqUpdate.forward ? "true" : "false");
 
   // If forward subscription and we haven't sent data yet, start sending mock data
   if (reqUpdate.forward && !forward_data_sent_ && trackConsumer_) {
-    std::cout << "MockSubscriptionHandle: Forward subscription detected, sending mock data"
-              << std::endl;
+    LOG(INFO) << "MockSubscriptionHandle: Forward subscription detected, sending mock data";
     forward_data_sent_ = true;  // Mark as sent to prevent duplicate sends
     folly::coro::co_withExecutor(
         folly::getGlobalCPUExecutor(),
@@ -53,14 +66,14 @@ MockFetchHandle::MockFetchHandle(moxygen::FetchOk ok)
     : moxygen::Publisher::FetchHandle(std::move(ok)) {}
 
 void MockFetchHandle::fetchCancel() {
-  std::cout << "MockFetchHandle::fetchCancel() called" << std::endl;
+  LOG(INFO) << "MockFetchHandle::fetchCancel() called";
   cancel_called_ = true;
 }
 
 folly::coro::Task<moxygen::Publisher::FetchHandle::RequestUpdateResult>
 MockFetchHandle::requestUpdate(moxygen::RequestUpdate reqUpdate) {
-  std::cout << "MockFetchHandle::requestUpdate() called with request ID: "
-            << reqUpdate.requestID << std::endl;
+  LOG(INFO) << "MockFetchHandle::requestUpdate() called with request ID: "
+            << reqUpdate.requestID;
   co_return moxygen::RequestOk{reqUpdate.requestID};
 }
 
@@ -69,7 +82,7 @@ MockFetchHandle::requestUpdate(moxygen::RequestUpdate reqUpdate) {
 // ============================================================================
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
 MockTrackConsumer::setTrackAlias(moxygen::TrackAlias alias) {
-  std::cout << "MockTrackConsumer::setTrackAlias: " << alias.value << std::endl;
+  LOG(INFO) << "MockTrackConsumer::setTrackAlias: " << alias.value;
   return folly::unit;
 }
 
@@ -79,13 +92,13 @@ MockTrackConsumer::beginSubgroup(uint64_t groupID, uint64_t subgroupID,
                                  moxygen::Priority priority,
                                  bool containsLastInGroup) {
   if (publishDone_received_) {
-    std::cerr << "MockTrackConsumer::beginSubgroup called after publishDone!" << std::endl;
+    LOG(ERROR) << "MockTrackConsumer::beginSubgroup called after publishDone!";
     return folly::makeUnexpected(moxygen::MoQPublishError(
         moxygen::MoQPublishError::API_ERROR, "Trying to publish after publishDone"));
   }
-  std::cout << "MockTrackConsumer::beginSubgroup - Group: " << groupID
+  LOG(INFO) << "MockTrackConsumer::beginSubgroup - Group: " << groupID
             << ", Subgroup: " << subgroupID 
-            << ", containsLastInGroup: " << containsLastInGroup << std::endl;
+            << ", containsLastInGroup: " << containsLastInGroup;
   return std::make_shared<MockSubgroupConsumer>();
 }
 
@@ -99,7 +112,7 @@ MockTrackConsumer::objectStream(const moxygen::ObjectHeader &header,
                                 moxygen::Payload payload,
                                 bool lastInGroup) {
   if (publishDone_received_) {
-    std::cerr << "MockTrackConsumer::objectStream called after publishDone!" << std::endl;
+    LOG(ERROR) << "MockTrackConsumer::objectStream called after publishDone!";
     return folly::makeUnexpected(moxygen::MoQPublishError(
         moxygen::MoQPublishError::API_ERROR, "Trying to publish after publishDone"));
   }
@@ -107,10 +120,10 @@ MockTrackConsumer::objectStream(const moxygen::ObjectHeader &header,
   if (payload) {
     payloadSize = payload->computeChainDataLength();
   }
-  std::cout << "MockTrackConsumer::objectStream RECEIVED - Group: " << header.group
+  LOG(INFO) << "MockTrackConsumer::objectStream RECEIVED - Group: " << header.group
             << ", Object: " << header.id 
             << ", PayloadSize: " << payloadSize
-            << " bytes, lastInGroup: " << lastInGroup << std::endl;
+            << " bytes, lastInGroup: " << lastInGroup;
   return folly::unit;
 }
 
@@ -119,7 +132,7 @@ MockTrackConsumer::datagram(const moxygen::ObjectHeader &header,
                             moxygen::Payload payload,
                             bool lastInGroup) {
   if (publishDone_received_) {
-    std::cerr << "MockTrackConsumer::datagram called after publishDone!" << std::endl;
+    LOG(ERROR) << "MockTrackConsumer::datagram called after publishDone!";
     return folly::makeUnexpected(moxygen::MoQPublishError(
         moxygen::MoQPublishError::API_ERROR, "Trying to publish after publishDone"));
   }
@@ -127,16 +140,16 @@ MockTrackConsumer::datagram(const moxygen::ObjectHeader &header,
   if (payload) {
     payloadSize = payload->computeChainDataLength();
   }
-  std::cout << "MockTrackConsumer::datagram RECEIVED - Group: " << header.group
+  LOG(INFO) << "MockTrackConsumer::datagram RECEIVED - Group: " << header.group
             << ", Object: " << header.id 
             << ", PayloadSize: " << payloadSize
-            << " bytes, lastInGroup: " << lastInGroup << std::endl;
+            << " bytes, lastInGroup: " << lastInGroup;
   return folly::unit;
 }
 
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
 MockTrackConsumer::publishDone(moxygen::PublishDone pubDone) {
-  std::cout << "MockTrackConsumer::publishDone RECEIVED" << std::endl;
+  LOG(INFO) << "MockTrackConsumer::publishDone RECEIVED";
   publishDone_received_ = true;
   return folly::unit;
 }
@@ -151,9 +164,9 @@ MockSubgroupConsumer::object(uint64_t objectID, moxygen::Payload payload,
   if (payload) {
     payloadSize = payload->computeChainDataLength();
   }
-  std::cout << "MockSubgroupConsumer::object RECEIVED - Object: " << objectID
+  LOG(INFO) << "MockSubgroupConsumer::object RECEIVED - Object: " << objectID
             << ", PayloadSize: " << payloadSize
-            << " bytes, finSubgroup: " << finSubgroup << std::endl;
+            << " bytes, finSubgroup: " << finSubgroup;
   return folly::unit;
 }
 
@@ -165,9 +178,9 @@ MockSubgroupConsumer::beginObject(uint64_t objectID, uint64_t length,
   if (initialPayload) {
     initialSize = initialPayload->computeChainDataLength();
   }
-  std::cout << "MockSubgroupConsumer::beginObject RECEIVED - Object: " << objectID
+  LOG(INFO) << "MockSubgroupConsumer::beginObject RECEIVED - Object: " << objectID
             << ", Length: " << length
-            << ", InitialPayloadSize: " << initialSize << std::endl;
+            << ", InitialPayloadSize: " << initialSize;
   return folly::unit;
 }
 
@@ -177,34 +190,33 @@ MockSubgroupConsumer::objectPayload(moxygen::Payload payload, bool finSubgroup) 
   if (payload) {
     payloadSize = payload->computeChainDataLength();
   }
-  std::cout << "MockSubgroupConsumer::objectPayload RECEIVED - PayloadSize: "
-            << payloadSize << " bytes, finSubgroup: " << finSubgroup << std::endl;
+  LOG(INFO) << "MockSubgroupConsumer::objectPayload RECEIVED - PayloadSize: "
+            << payloadSize << " bytes, finSubgroup: " << finSubgroup;
   return moxygen::ObjectPublishStatus::DONE;
 }
 
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
 MockSubgroupConsumer::endOfGroup(uint64_t endOfGroupObjectID) {
-  std::cout << "MockSubgroupConsumer::endOfGroup RECEIVED - ObjectID: "
-            << endOfGroupObjectID << std::endl;
+  LOG(INFO) << "MockSubgroupConsumer::endOfGroup RECEIVED - ObjectID: "
+            << endOfGroupObjectID;
   return folly::unit;
 }
 
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
 MockSubgroupConsumer::endOfTrackAndGroup(uint64_t endOfTrackObjectID) {
-  std::cout << "MockSubgroupConsumer::endOfTrackAndGroup RECEIVED - ObjectID: "
-            << endOfTrackObjectID << std::endl;
+  LOG(INFO) << "MockSubgroupConsumer::endOfTrackAndGroup RECEIVED - ObjectID: "
+            << endOfTrackObjectID;
   return folly::unit;
 }
 
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
 MockSubgroupConsumer::endOfSubgroup() {
-  std::cout << "MockSubgroupConsumer::endOfSubgroup RECEIVED" << std::endl;
+  LOG(INFO) << "MockSubgroupConsumer::endOfSubgroup RECEIVED";
   return folly::unit;
 }
 
 void MockSubgroupConsumer::reset(moxygen::ResetStreamErrorCode error) {
-  std::cout << "MockSubgroupConsumer::reset - Error: " << static_cast<uint32_t>(error)
-            << std::endl;
+  LOG(INFO) << "MockSubgroupConsumer::reset - Error: " << static_cast<uint32_t>(error);
 }
 
 folly::Expected<folly::SemiFuture<uint64_t>, moxygen::MoQPublishError>
@@ -220,9 +232,9 @@ MockFetchConsumer::object(uint64_t groupID, uint64_t subgroupID,
                           uint64_t objectID, moxygen::Payload payload,
                           moxygen::Extensions extensions, bool finFetch,
                           bool forwardingPreferenceIsDatagram) {
-  std::cout << "MockFetchConsumer::object - Group: " << groupID
+  LOG(INFO) << "MockFetchConsumer::object - Group: " << groupID
             << ", Subgroup: " << subgroupID << ", Object: " << objectID
-            << ", finFetch: " << finFetch << std::endl;
+            << ", finFetch: " << finFetch;
   return folly::unit;
 }
 
@@ -231,46 +243,42 @@ MockFetchConsumer::beginObject(uint64_t groupID, uint64_t subgroupID,
                                uint64_t objectID, uint64_t length,
                                moxygen::Payload initialPayload,
                                moxygen::Extensions extensions) {
-  std::cout << "MockFetchConsumer::beginObject - Group: " << groupID
+  LOG(INFO) << "MockFetchConsumer::beginObject - Group: " << groupID
             << ", Subgroup: " << subgroupID << ", Object: " << objectID
-            << ", Length: " << length << std::endl;
+            << ", Length: " << length;
   return folly::unit;
 }
 
 folly::Expected<moxygen::ObjectPublishStatus, moxygen::MoQPublishError>
 MockFetchConsumer::objectPayload(moxygen::Payload payload, bool finSubgroup) {
-  std::cout << "MockFetchConsumer::objectPayload - finSubgroup: " << finSubgroup
-            << std::endl;
+  LOG(INFO) << "MockFetchConsumer::objectPayload - finSubgroup: " << finSubgroup;
   return moxygen::ObjectPublishStatus::DONE;
 }
 
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
 MockFetchConsumer::endOfGroup(uint64_t groupID, uint64_t subgroupID,
                               uint64_t objectID, bool finFetch) {
-  std::cout << "MockFetchConsumer::endOfGroup - Group: " << groupID
-            << ", Subgroup: " << subgroupID << ", Object: " << objectID
-            << std::endl;
+  LOG(INFO) << "MockFetchConsumer::endOfGroup - Group: " << groupID
+            << ", Subgroup: " << subgroupID << ", Object: " << objectID;
   return folly::unit;
 }
 
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
 MockFetchConsumer::endOfTrackAndGroup(uint64_t groupID, uint64_t subgroupID,
                                       uint64_t objectID) {
-  std::cout << "MockFetchConsumer::endOfTrackAndGroup - Group: " << groupID
-            << ", Subgroup: " << subgroupID << ", Object: " << objectID
-            << std::endl;
+  LOG(INFO) << "MockFetchConsumer::endOfTrackAndGroup - Group: " << groupID
+            << ", Subgroup: " << subgroupID << ", Object: " << objectID;
   return folly::unit;
 }
 
 folly::Expected<folly::Unit, moxygen::MoQPublishError>
 MockFetchConsumer::endOfFetch() {
-  std::cout << "MockFetchConsumer::endOfFetch" << std::endl;
+  LOG(INFO) << "MockFetchConsumer::endOfFetch";
   return folly::unit;
 }
 
 void MockFetchConsumer::reset(moxygen::ResetStreamErrorCode error) {
-  std::cout << "MockFetchConsumer::reset - Error: " << static_cast<uint32_t>(error)
-            << std::endl;
+  LOG(INFO) << "MockFetchConsumer::reset - Error: " << static_cast<uint32_t>(error);
 }
 
 folly::Expected<folly::SemiFuture<uint64_t>, moxygen::MoQPublishError>
@@ -307,18 +315,18 @@ folly::coro::Task<void> sendMockDataViaObjectStream(
         auto result = consumer->objectStream(header, std::move(payload));
         
         if (result.hasError()) {
-          std::cerr << "Failed to send object: " 
-                    << result.error().what() << std::endl;
+          LOG(ERROR) << "Failed to send object: " 
+                    << result.error().what();
           co_return;
         }
         
-        std::cout << "Mock data sent: Group=" << group 
-                  << " Object=" << objectId << std::endl;
+        LOG(INFO) << "Mock data sent: Group=" << group 
+                  << " Object=" << objectId;
       }
     }
   } catch (const std::exception& ex) {
-    std::cerr << "Exception in mock data generation: " 
-              << ex.what() << std::endl;
+    LOG(ERROR) << "Exception in mock data generation: " 
+              << ex.what();
   }
 }
 
@@ -332,8 +340,8 @@ folly::coro::Task<void> sendMockDataViaTrackConsumer(
       // Begin a subgroup
       auto subgroupResult = consumer->beginSubgroup(group, 0, 128);
       if (subgroupResult.hasError()) {
-        std::cerr << "Failed to begin subgroup: " 
-                  << subgroupResult.error().what() << std::endl;
+        LOG(ERROR) << "Failed to begin subgroup: " 
+                  << subgroupResult.error().what();
         co_return;
       }
       
@@ -356,19 +364,19 @@ folly::coro::Task<void> sendMockDataViaTrackConsumer(
         );
         
         if (objectResult.hasError()) {
-          std::cerr << "Failed to send object: " 
-                    << objectResult.error().what() << std::endl;
+          LOG(ERROR) << "Failed to send object: " 
+                    << objectResult.error().what();
           co_return;
         }
         
-        std::cout << "Mock data sent: Group=" << group 
-                  << " Object=" << objectId << std::endl;
+        LOG(INFO) << "Mock data sent: Group=" << group 
+                  << " Object=" << objectId;
       }
     }
     
   } catch (const std::exception& ex) {
-    std::cerr << "Exception in mock data generation: " 
-              << ex.what() << std::endl;
+    LOG(ERROR) << "Exception in mock data generation: " 
+              << ex.what();
   }
 }
 
@@ -379,10 +387,10 @@ folly::coro::Task<void> sendMockDataViaTrackConsumer(
 // ============================================================================
 folly::coro::Task<moxygen::Publisher::TrackStatusResult>
 MockPublisher::trackStatus(const moxygen::TrackStatus trackStatus) {
-  std::cout << "MockPublisher::trackStatus called for track: "
+  LOG(INFO) << "MockPublisher::trackStatus called for track: "
             << trackStatus.fullTrackName.trackName << " (namespace: "
             << trackStatus.fullTrackName.trackNamespace << ")"
-            << " with requestID: " << trackStatus.requestID.value << std::endl;
+            << " with requestID: " << trackStatus.requestID.value;
 
   // Return a successful TrackStatusOk response
   moxygen::TrackStatusOk statusOk;
@@ -394,8 +402,8 @@ MockPublisher::trackStatus(const moxygen::TrackStatus trackStatus) {
   statusOk.fullTrackName = trackStatus.fullTrackName;
   statusOk.statusCode = moxygen::TrackStatusCode::IN_PROGRESS;
   
-  std::cout << "MockPublisher: Returning TrackStatusOk for request " 
-            << trackStatus.requestID.value << std::endl;
+  LOG(INFO) << "MockPublisher: Returning TrackStatusOk for request " 
+            << trackStatus.requestID.value;
   co_return statusOk;
 }
 
@@ -405,11 +413,10 @@ MockPublisher::trackStatus(const moxygen::TrackStatus trackStatus) {
 folly::coro::Task<moxygen::Publisher::SubscribeResult>
 MockPublisher::subscribe(moxygen::SubscribeRequest sub,
                          std::shared_ptr<moxygen::TrackConsumer> callback) {
-  std::cout << "MockPublisher::subscribe called for track: "
+  LOG(INFO) << "MockPublisher::subscribe called for track: "
             << sub.fullTrackName.trackName << " (namespace: "
-            << sub.fullTrackName.trackNamespace << ")" << std::endl;
-  std::cout << "  forward: " << (sub.forward ? "true" : "false")
-            << std::endl;
+            << sub.fullTrackName.trackNamespace << ")";
+  LOG(INFO) << "  forward: " << (sub.forward ? "true" : "false");
 
   // Create a subscription handle with the callback as the TrackConsumer
   moxygen::SubscribeOk subscribeOk;
@@ -428,7 +435,7 @@ MockPublisher::subscribe(moxygen::SubscribeRequest sub,
     if (eventBase_) {
       // Schedule on EventBase thread for realistic behavior (matches real MoQSession)
       eventBase_->runInEventBaseThread([reqId = sub.requestID, callback, eventBase = eventBase_]() mutable {
-        std::cout << "MockPublisher: Forward subscription detected, sending mock data" << std::endl;
+        LOG(INFO) << "MockPublisher: Forward subscription detected, sending mock data";
         folly::coro::co_withExecutor(
             folly::getKeepAliveToken(eventBase),
             sendMockDataViaTrackConsumer(callback, reqId)
@@ -436,14 +443,14 @@ MockPublisher::subscribe(moxygen::SubscribeRequest sub,
       });
     } else {
       // Fallback to CPU executor if no EventBase available
-      std::cout << "MockPublisher: Forward subscription detected, sending mock data" << std::endl;
+      LOG(INFO) << "MockPublisher: Forward subscription detected, sending mock data";
       folly::coro::co_withExecutor(
           folly::getGlobalCPUExecutor(),
           sendMockDataViaTrackConsumer(callback, sub.requestID)
       ).start();
     }
   } else {
-    std::cout << "MockPublisher: Direct subscription, not sending mock data" << std::endl;
+    LOG(INFO) << "MockPublisher: Direct subscription, not sending mock data";
   }
   
   co_return handle;
@@ -453,18 +460,18 @@ MockPublisher::subscribe(moxygen::SubscribeRequest sub,
 folly::coro::Task<moxygen::Publisher::FetchResult>
 MockPublisher::fetch(moxygen::Fetch fetchReq,
                      std::shared_ptr<moxygen::FetchConsumer> fetchCallback) {
-  std::cout << "MockPublisher::fetch called for track: "
+  LOG(INFO) << "MockPublisher::fetch called for track: "
             << fetchReq.fullTrackName.trackName << " (namespace: "
-            << fetchReq.fullTrackName.trackNamespace << ")" << std::endl;
-  std::cout << "  requestID: " << fetchReq.requestID.value << std::endl;
+            << fetchReq.fullTrackName.trackNamespace << ")";
+  LOG(INFO) << "  requestID: " << fetchReq.requestID.value;
   
   // Extract start/end from the fetch args if it's a standalone fetch
   auto [standaloneFetch, joiningFetch] = moxygen::fetchType(fetchReq);
   if (standaloneFetch) {
-    std::cout << "  start: group=" << standaloneFetch->start.group 
-              << ", object=" << standaloneFetch->start.object << std::endl;
-    std::cout << "  end: group=" << standaloneFetch->end.group 
-              << ", object=" << standaloneFetch->end.object << std::endl;
+    LOG(INFO) << "  start: group=" << standaloneFetch->start.group 
+              << ", object=" << standaloneFetch->start.object;
+    LOG(INFO) << "  end: group=" << standaloneFetch->end.group 
+              << ", object=" << standaloneFetch->end.object;
   }
 
   // Create a FetchOk response
@@ -517,23 +524,23 @@ MockPublisher::fetch(moxygen::Fetch fetchReq,
           );
           
           if (objectResult.hasError()) {
-            std::cerr << "Failed to send fetch object: " 
-                      << objectResult.error().what() << std::endl;
+            LOG(ERROR) << "Failed to send fetch object: " 
+                      << objectResult.error().what();
             co_return;
           }
           
-          std::cout << "MockPublisher sent fetch object: Group=" << group 
-                    << " Object=" << objectId << " finFetch=" << finFetch << std::endl;
+          LOG(INFO) << "MockPublisher sent fetch object: Group=" << group 
+                    << " Object=" << objectId << " finFetch=" << finFetch;
         }
       }
       
       // Signal end of fetch
-      std::cout << "MockPublisher: Sending endOfFetch" << std::endl;
+      LOG(INFO) << "MockPublisher: Sending endOfFetch";
       consumer->endOfFetch();
       
     } catch (const std::exception& ex) {
-      std::cerr << "Exception in MockPublisher fetch data generation: " 
-                << ex.what() << std::endl;
+      LOG(ERROR) << "Exception in MockPublisher fetch data generation: " 
+                << ex.what();
     }
   };
   
@@ -567,13 +574,13 @@ MockPublisher::fetch(moxygen::Fetch fetchReq,
 moxygen::Subscriber::PublishResult
 MockSubscriber::publish(moxygen::PublishRequest pub,
                         std::shared_ptr<moxygen::SubscriptionHandle> handle) {
-  std::cout << "MockSubscriber::publish called for track: "
+  LOG(INFO) << "MockSubscriber::publish called for track: "
             << pub.fullTrackName.trackName << " (namespace: "
-            << pub.fullTrackName.trackNamespace << ")" << std::endl;
+            << pub.fullTrackName.trackNamespace << ")";
 
   // For now, return NOT_SUPPORTED as we don't expect to receive PUBLISH
   // In a real relay scenario, you might accept this and create a consumer
-  // Can we use publish_namespace to test this?
+  // Can we use publishNamespace to test this?
   return folly::makeUnexpected(moxygen::PublishError{
       pub.requestID,
       moxygen::PublishErrorCode::NOT_SUPPORTED,

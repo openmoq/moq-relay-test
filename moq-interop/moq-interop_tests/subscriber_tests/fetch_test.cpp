@@ -31,7 +31,7 @@ private:
   std::string trackName_{"fetch-track"};
 };
 
-// Auto-register this test
+// Disabled: not yet supported by relay under test. Re-enable when fixed.
 // REGISTER_TEST(FetchTest);
 
 TestResult FetchTest::execute() {

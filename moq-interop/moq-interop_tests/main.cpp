@@ -4,6 +4,7 @@
 #include <folly/init/Init.h>
 #include <folly/io/async/EventBaseThread.h>
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <iostream>
 #include <map>
 
@@ -17,51 +18,51 @@ DEFINE_string(
     "Available: Publisher, Subscriber, Namespace, ErrorHandling, Update, Connection, All");
 DEFINE_bool(list, false, "List all available tests without running them");
 
-using namespace interop_test;
+namespace it = interop_test;
 
 /**
  * Parse category names from string to bit flags
  */
-TestCategory parseCategoryFilter(const std::string& categoryStr) {
+it::TestCategory parseCategoryFilter(const std::string& categoryStr) {
   if (categoryStr.empty()) {
-    return TestCategory::ALL;
+    return it::TestCategory::ALL;
   }
 
   // Category name to flag mapping
-  static const std::map<std::string, TestCategory> categoryMap = {
-    {"publisher", TestCategory::PUBLISHER},
-    {"subscriber", TestCategory::SUBSCRIBER},
-    {"namespace", TestCategory::NAMESPACE},
-    {"errorhandling", TestCategory::ERROR_HANDLING},
-    {"error_handling", TestCategory::ERROR_HANDLING},
-    {"update", TestCategory::UPDATE},
-    {"connection", TestCategory::CONNECTION},
-    {"all", TestCategory::ALL}
+  static const std::map<std::string, it::TestCategory> categoryMap = {
+    {"publisher", it::TestCategory::PUBLISHER},
+    {"subscriber", it::TestCategory::SUBSCRIBER},
+    {"namespace", it::TestCategory::NAMESPACE},
+    {"errorhandling", it::TestCategory::ERROR_HANDLING},
+    {"error_handling", it::TestCategory::ERROR_HANDLING},
+    {"update", it::TestCategory::UPDATE},
+    {"connection", it::TestCategory::CONNECTION},
+    {"all", it::TestCategory::ALL}
   };
 
   std::vector<std::string> categoryNames;
   folly::split(',', categoryStr, categoryNames, true);
 
-  TestCategory filter = TestCategory::NONE;
+  it::TestCategory filter = it::TestCategory::NONE;
   
   for (const auto& name : categoryNames) {
     std::string lower = name;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     
-    auto it = categoryMap.find(lower);
-    if (it != categoryMap.end()) {
-      if (it->second == TestCategory::ALL) {
-        return TestCategory::ALL;  // If "all" is specified, return immediately
+    auto mapIt = categoryMap.find(lower);
+    if (mapIt != categoryMap.end()) {
+      if (mapIt->second == it::TestCategory::ALL) {
+        return it::TestCategory::ALL;  // If "all" is specified, return immediately
       }
-      filter |= it->second;
+      filter |= mapIt->second;
     } else {
-      std::cerr << "Warning: Unknown category '" << name << "', ignoring.\n";
+      LOG(WARNING) << "Unknown category '" << name << "', ignoring.";
     }
   }
   
   // If no valid categories were parsed, default to ALL
-  if (filter == TestCategory::NONE) {
-    return TestCategory::ALL;
+  if (filter == it::TestCategory::NONE) {
+    return it::TestCategory::ALL;
   }
   
   return filter;
@@ -77,10 +78,10 @@ int main(int argc, char *argv[]) {
   auto eventBase = eventBaseThread.getEventBase();
 
   // Create test suite
-  auto testSuite = std::make_unique<TestSuite>(eventBase);
+  auto testSuite = std::make_unique<it::TestSuite>(eventBase);
 
   // Configure test suite
-  TestSuiteConfig config;
+  it::TestSuiteConfig config;
   config.relayUrl = FLAGS_relay;
   config.categoryFilter = parseCategoryFilter(FLAGS_categories);
 
@@ -97,12 +98,6 @@ int main(int argc, char *argv[]) {
 
   // Run all tests
   bool success = testSuite->runAll(config);
-
-  // // Destroy test suite BEFORE EventBaseThread so all sessions are cleaned up
-  // // before the EventBase stops.
-  // testSuite.reset();
-
-  // eventBaseThread.stop();
 
   return success ? 0 : 1;
 }

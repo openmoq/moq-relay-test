@@ -43,18 +43,18 @@ public:
   virtual bool fetch(const std::string &trackNamespace,
                      const std::string &trackName) = 0;
 
-  virtual bool publish_namespace(const std::string &trackNamespace) = 0;
+  virtual bool publishNamespace(const std::string &trackNamespace) = 0;
 
-  virtual bool publish_namespace_done(const std::string &trackNamespace) = 0;
+  virtual bool publishNamespaceDone(const std::string &trackNamespace) = 0;
 
-  virtual bool subscribe_namespace(const std::string &trackNamespace) = 0;
+  virtual bool subscribeNamespace(const std::string &trackNamespace) = 0;
 
   virtual bool trackStatus(const std::string &trackNamespace,
                            const std::string &trackName) = 0;
 
   virtual bool goaway() = 0;
 
-  virtual bool goaway_sequence() = 0;
+  virtual bool goawaySequence() = 0;
 
   virtual bool setMaxConcurrentRequests(uint32_t maxConcurrentRequests) = 0;
 
