@@ -74,32 +74,34 @@ configuring or building the interop tests.
 From `moq-interop_tests/`:
 
 ```bash
-bash scripts/build.sh              # default: moxygen preset
-bash scripts/build.sh moxygen-san  # AddressSanitizer build
-bash scripts/build.sh core         # no moxygen_adapter
+bash scripts/build.sh              # RelWithDebInfo  → build/
+bash scripts/build.sh --asan       # AddressSanitizer → build_address/
+bash scripts/build.sh --tsan       # ThreadSanitizer  → build_thread/
+bash scripts/build.sh --ubsan      # UBSanitizer      → build_undefined/
+bash scripts/build.sh --clean      # wipe build dir first
 ```
 
-The compiled binary is placed at `moq-interop_tests/build/bin/interop_tests`.
+The compiled binary is placed at `<build_dir>/bin/interop_tests`.
 
 ### Manual configure + build
 
 Source the getdeps environment first, then:
 
 ```bash
-# Source getdeps env
+# Source getdeps env (sets CMAKE_PREFIX_PATH for find_package)
 cd moqt_implementation/moxygen/moxygen
 eval "$(python3 build/fbcode_builder/getdeps.py env moxygen)"
 
-# Configure
+# Configure & build
 cmake -S ../../../moq-interop_tests \
       -B ../../../moq-interop_tests/build \
       -G Ninja \
-      -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-      -DWITH_MOXYGEN_ADAPTER=ON
-
-# Build
+      -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build ../../../moq-interop_tests/build -- -j$(nproc)
 ```
+
+All third-party dependencies (folly, fizz, mvfst, proxygen, wangle, glog,
+gflags, …) are pulled in transitively via `find_package(moxygen CONFIG REQUIRED)`.
 
 ### Run
 

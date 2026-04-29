@@ -19,6 +19,14 @@ TestResult BaseTest::run() {
       fixture_->setUp();
     }
 
+    // Sanity check: test fixture must be set before execution
+    if (!fixture_) {
+      setError("Test fixture is not set. "
+               "This likely indicates WITH_MOXYGEN_ADAPTER was not defined at compile time.");
+      logAlways("Test ERROR: " + lastError_);
+      return TestResult::ERROR;
+    }
+
     // Execute phase
     log("Executing test...");
     TestResult result = execute();
