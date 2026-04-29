@@ -61,7 +61,6 @@ set(SOURCES
     test_suite.cpp
     test_registry.cpp
     base/base_test.cpp
-    base/moqt_interface.cpp
     publisher_tests/publish_test.cpp
     publisher_tests/publish_namespace_test.cpp
     publisher_tests/publish_namespace_done_test.cpp

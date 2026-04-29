@@ -101,11 +101,6 @@ public:
   virtual TestCategory getCategories() const = 0;
 
   /**
-   * Get list of test names this test depends on (must run before this test)
-   */
-  virtual std::vector<std::string> getDependencies() const { return {}; }
-
-  /**
    * Set the test fixture (called by derived classes or test framework)
    */
   void setFixture(std::shared_ptr<ITestFixture> fixture) { fixture_ = fixture; }
