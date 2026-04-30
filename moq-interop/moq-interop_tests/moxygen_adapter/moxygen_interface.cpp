@@ -193,13 +193,12 @@ folly::coro::Task<bool> MoxygenInterface::_doPublish(
         co_return false;
       }
       
-      // At this point, we successfully got a PUBLISH_OK response
-      // Check if relay accepted forward mode - only send data if requested
-      if (forward && publishTrackConsumer_) {
-        // Send mock data to the relay
-        co_await sendMockDataViaObjectStream(publishTrackConsumer_, publishReq.requestID);
-      }
-      
+      // At this point, we successfully got a PUBLISH_OK response.
+      // Do NOT proactively push data through publishTrackConsumer_ here.
+      // The relay's TrackConsumer refuses data until at least one forward
+      // subscriber exists.  Data will be sent reactively via
+      // MockPublisher::subscribe() when the relay forwards a forward=true
+      // subscription to us.
       co_return true;
     } else {
       auto error = publishResult.error();
@@ -531,7 +530,7 @@ MoxygenInterface::trackStatus(const std::string &trackNamespace,
                                .trackName = trackName},
                            .priority = 128,
                            .groupOrder = moxygen::GroupOrder::Default,
-                           .forward = false,
+                           .forward = true,
                            .locType = moxygen::LocationType::LargestGroup,
                            .start = std::nullopt,
                            .endGroup = 0})
