@@ -4,7 +4,6 @@
 #include "type_conversions.h"
 #include <folly/futures/Future.h>
 #include <folly/coro/BlockingWait.h>
-#include <folly/coro/Sleep.h>
 #include <folly/coro/Coroutine.h>
 #include <folly/Executor.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
@@ -605,12 +604,12 @@ bool MoxygenInterface::goawaySequence() {
       return false;
     }
 
-    // Wait for the session to process the goaway and close gracefully.
-    // This prevents a race condition where the relay closes the session
-    // while we're still trying to clean it up in tearDown().
-    // Using blockingWait on a small sleep to allow event base processing.
-    LOG(INFO) << "Waiting for goaway to be processed...";
-    folly::coro::blockingWait(folly::coro::sleep(std::chrono::milliseconds(100)));
+    // Flush the EventBase: run a no-op on the EventBase thread and wait for
+    // it to complete.  Any callbacks queued by the goaway (e.g. session
+    // state updates) will have run before this no-op executes, ensuring a
+    // clean state before tearDown() closes the session.
+    LOG(INFO) << "Flushing EventBase after goaway...";
+    eventBase_->runInEventBaseThreadAndWait([]() {});
 
     LOG(INFO) << "Goaway sequence completed successfully";
 

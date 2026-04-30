@@ -3,7 +3,6 @@
 #include "test_registry.h"
 #include <memory>
 #include <string>
-#include <thread>
 
 namespace interop_test {
 
@@ -47,9 +46,6 @@ TestResult FetchTest::execute() {
   bool publishResult = publisher->publish(trackNamespace_, trackName_);
   assertTrue(publishResult, "Publish request should succeed");
   log("Publish successful");
-
-  // Give the relay time to process the publish request
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
   auto subscriber = fixture_->getSubscriber();
   assertNotNull(subscriber.get(), "Subscriber interface should not be null");

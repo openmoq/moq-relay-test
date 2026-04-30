@@ -4,7 +4,6 @@
 #include <folly/coro/BlockingWait.h>
 #include <iostream>
 #include <moxygen/MoQSession.h>
-#include <thread>
 
 namespace interop_test {
 
@@ -151,8 +150,6 @@ void MoxygenTestFixture::cleanupInterface(std::shared_ptr<MoxygenInterface> &int
                     << " session: " << ex.what();
         }
       });
-      // Give time for graceful shutdown
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
   } catch (const std::exception &ex) {
     LOG(ERROR) << "  [Fixture] Exception during " << name

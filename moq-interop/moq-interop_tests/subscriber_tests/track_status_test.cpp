@@ -6,7 +6,6 @@
 #include <memory>
 #include <moxygen/MoQConsumers.h>
 #include <string>
-#include <thread>
 
 namespace interop_test {
 
@@ -51,9 +50,6 @@ TestResult TrackStatusTest::execute() {
   bool publishResult = publisher->publish(trackNamespace_, trackName_, true);
   assertTrue(publishResult, "Publish request should succeed");
   log("Publish successful");
-
-  // Give the relay time to process the publish request
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
   // Request track status from a different connection
   log("Requesting track status");
