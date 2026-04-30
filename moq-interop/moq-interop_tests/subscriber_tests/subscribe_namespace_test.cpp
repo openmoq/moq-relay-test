@@ -1,0 +1,52 @@
+#include "base/base_test.h"
+#include "base/moqt_interface.h"
+#include "test_registry.h"
+#include <folly/coro/BlockingWait.h>
+
+namespace interop_test {
+class SubscribeNamespaceTest : public BaseTest {
+public:
+  explicit SubscribeNamespaceTest(const TestContext &context)
+      : BaseTest(context) {}
+  ~SubscribeNamespaceTest() override = default;
+  std::string getName() const override { return "SubscribeNamespaceTest"; }
+  std::string getDescription() const override {
+    return "Verifies that a client can subscribe to a namespace via the relay";
+  }
+  TestCategory getCategories() const override { 
+    return TestCategory::SUBSCRIBER | TestCategory::NAMESPACE; 
+  }
+
+protected:
+  TestResult execute() override;
+
+private:
+  std::string trackNamespace_{"test1/namespace"};
+};
+
+REGISTER_TEST(SubscribeNamespaceTest);
+
+TestResult SubscribeNamespaceTest::execute() {
+  log("Subscribing to namespace: " + trackNamespace_);
+
+  /* subscribe_namespace doesn't throw an error if the namespace doesn't exist, 
+   it just returns success and then no updates will be received. 
+   So we can test the subscribe_namespace flow without needing to set up a publisher */
+   
+   // Get subscriber connection from fixture 
+  auto subscriber = fixture_->getSubscriber();
+  assertNotNull(subscriber.get(), "Subscriber interface should not be null");
+  assertTrue(subscriber->isConnected(), "Subscriber should be connected");
+
+  // Send subscribe request
+  log("Sending subscribe namespace request...");
+  bool subscribeResult = subscriber->subscribe_namespace(trackNamespace_);
+
+  // Verify subscribe succeeded
+  assertTrue(subscribeResult, "Subscribe request should succeed");
+  log("Subscribe to namespace successful");
+
+  return TestResult::PASS;
+}
+
+} // namespace interop_test

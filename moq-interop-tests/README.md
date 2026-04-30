@@ -1,1 +1,0 @@
-# MoQ Interop Tests

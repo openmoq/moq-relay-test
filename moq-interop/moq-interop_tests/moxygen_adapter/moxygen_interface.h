@@ -1,0 +1,174 @@
+#pragma once
+
+#include "base/moqt_interface.h"
+#include <chrono>
+#include <fizz/tool/CertificateVerifiers.h>
+#include <folly/coro/Task.h>
+#include <folly/io/async/EventBase.h>
+#include <memory>
+#include <moxygen/MoQClient.h>
+#include <moxygen/MoQRelaySession.h>
+#include <moxygen/MoQSession.h>
+#include <moxygen/Publisher.h>
+#include <moxygen/Subscriber.h>
+#include <moxygen/events/MoQFollyExecutorImpl.h>
+#include <moxygen/MoQFramer.h>
+#include <proxygen/lib/utils/URL.h>
+#include <string>
+
+namespace interop_test {
+
+// Forward declarations
+class MockSubscriptionHandle;
+class MockFetchConsumer;
+class MockPublisher;
+class MockSubscriber;
+
+/**
+ * MoxygenInterface - Moxygen implementation of MoqtInterface
+ * Provides MoQ operations using the moxygen library
+ */
+class MoxygenInterface : public MoqtInterface {
+public:
+  explicit MoxygenInterface(folly::EventBase *eventBase);
+  ~MoxygenInterface() override;
+
+  /**
+   * Establishes a MoQ session with the given URL
+   * @param url The MoQ relay server URL
+   * @param connectTimeout Connection timeout
+   * @param transactionTimeout Transaction timeout
+   * @param useInsecureVerifier Whether to use insecure certificate verification
+   * @return true on success
+   */
+  bool connect(const std::string &url,
+               std::chrono::milliseconds connectTimeout =
+                   std::chrono::milliseconds(30000),
+               std::chrono::milliseconds transactionTimeout =
+                   std::chrono::milliseconds(30000),
+               bool useInsecureVerifier = true) override;
+
+  /**
+   * Sends a publish request to the MoQ relay
+   * @param trackNamespace The track namespace
+   * @param trackName The track name
+   * @param forward Whether to forward the publish request (default: false)
+   * @param subscriptionHandle Optional subscription handle
+   * @return true on success
+   */
+  bool
+  publish(const std::string &trackNamespace, const std::string &trackName, bool forward = false) override;
+
+  /**
+   * Subscribes to a track on the MoQ relay
+   * @param trackNamespace The track namespace
+   * @param trackName The track name
+   * @param trackConsumer Callback to receive track data
+   * @param priority Subscribe priority (default: 128)
+   * @param groupOrder Group ordering preference (default: OldestFirst)
+   * @return true on success
+   */
+  bool
+  subscribe(const std::string &trackNamespace, const std::string &trackName,
+            uint8_t priority = 128,
+            GroupOrder groupOrder = GroupOrder::OldestFirst) override;
+
+  bool subscribeUpdate(const std::string &trackNamespace, const std::string &trackName,
+            uint8_t priority = 128,
+            GroupOrder groupOrder = GroupOrder::OldestFirst,
+            AbsoluteLocation start = AbsoluteLocation{0,0},
+            uint8_t endGroup = 0) override;
+
+  bool fetch(const std::string &trackNamespace, const std::string &trackName) override;
+  /**
+   * Announces a namespace to the MoQ relay
+   * @param trackNamespace The namespace to announce (e.g., "video/conference")
+   * @return true on success
+   */
+  bool publish_namespace(const std::string &trackNamespace) override;
+
+  /**
+   * Signals publish done for a namespace to the MoQ relay
+   * @param trackNamespace The namespace to unannounce (e.g.,
+   * "video/conference")
+   * @return true on success
+   */
+  bool publish_namespace_done(const std::string &trackNamespace) override;
+
+  /**
+   * Subscribes to announces for a given namespace prefix
+   * @param trackNamespace The namespace prefix to subscribe to (e.g., "video/")
+   * @return true on success
+   */
+  bool subscribe_namespace(const std::string &trackNamespace) override;
+
+  /**
+   * Sends a track status request to the MoQ relay
+   * @param trackNamespace The track namespace
+   * @param trackName The track name
+   * @return true on success
+   */
+  bool trackStatus(const std::string &trackNamespace,
+                                      const std::string &trackName) override;
+
+  /**
+   * Sends a goaway signal to the MoQ relay
+   * @return true on success
+   */
+  bool goaway() override;
+
+  /**
+   * Sends a goaway signal after publishing a dummy track
+   * @return true on success
+   */
+  bool goaway_sequence() override;
+
+  bool
+  setMaxConcurrentRequests(uint32_t maxConcurrentRequests) override;
+
+  std::shared_ptr<moxygen::MoQClient> getClient() const { return client_; }
+
+  bool isConnected() const override { return client_ && client_->moqSession_; }
+
+private:
+  folly::coro::Task<moxygen::MoQRelaySession::SubscribeResult> _doSubscribe(
+      const std::string &trackNamespace,
+      const std::string &trackName,
+      uint8_t priority,
+      moxygen::GroupOrder groupOrder);
+
+  folly::coro::Task<moxygen::Subscriber::PublishNamespaceResult>
+  _doPublishNamespace(const std::string &trackNamespace);
+
+  folly::coro::Task<bool>
+  _doPublish(const std::string &trackNamespace, const std::string &trackName,
+          std::shared_ptr<MockSubscriptionHandle> externalHandle = nullptr,
+          bool forward = false);
+
+  /**
+   * Safely destroy client_ and relaySession_ on the EventBase thread.
+   *
+   * QUIC transport objects and their timers live on the EventBase thread.
+   * Destroying them from any other thread races with pending callbacks
+   * (e.g. idleTimeoutExpired -> onSessionEnd -> ~MoQSession).
+   * This helper transfers ownership of the shared_ptrs into a lambda that
+   * runs on the EventBase thread, so all in-flight callbacks complete before
+   * the destructors run.
+   */
+  void resetClientOnEventBase();
+
+  folly::EventBase *eventBase_;
+  std::shared_ptr<moxygen::MoQFollyExecutorImpl> executor_; // Keep executor alive
+  std::shared_ptr<moxygen::MoQClient> client_;
+  std::shared_ptr<moxygen::MoQRelaySession>
+      relaySession_; // Cache the casted session
+  std::shared_ptr<moxygen::TrackConsumer> publishTrackConsumer_; // Store track consumer from publish
+  std::shared_ptr<MockFetchConsumer> fetchConsumer_; // Keep fetch consumer alive
+  std::shared_ptr<MockSubscriptionHandle> subscriptionHandle_; // Keep subscription handle alive for subscribe updates
+  
+  // Mock handlers for incoming requests from the relay
+  std::shared_ptr<MockPublisher> publishHandler_;   // Handles incoming SUBSCRIBE
+  std::shared_ptr<MockSubscriber> subscribeHandler_; // Handles incoming PUBLISH
+};
+
+} // namespace interop_test
