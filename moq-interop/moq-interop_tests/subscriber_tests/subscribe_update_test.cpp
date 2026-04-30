@@ -32,8 +32,12 @@ protected:
   TestResult execute() override;
 
 private:
-  std::string trackNamespace_{"test"};
-  std::string trackName_{"interop-track"};
+  const std::string suffix_{std::to_string(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count())};
+  std::string trackNamespace_{"test-" + suffix_};
+  std::string trackName_{"interop-track-" + suffix_};
 };
 
 // Auto-register this test
@@ -53,7 +57,7 @@ TestResult SubscribeUpdateTest::execute() {
   assertTrue(publishResult, "Publish request should succeed");
   log("Publish successful");
 
-  // Send subscribe update
+  // Send subscribe update (the adapter subscribes then updates internally)
   log("Sending subscribe update");
   auto subscriber = fixture_->getSubscriber();
   bool updateResult = subscriber->subscribeUpdate(trackNamespace_, trackName_);

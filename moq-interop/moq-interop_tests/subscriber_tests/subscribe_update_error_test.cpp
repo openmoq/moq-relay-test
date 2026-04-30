@@ -33,8 +33,12 @@ protected:
   TestResult execute() override;
 
 private:
-  std::string trackNamespace_{"test"};
-  std::string trackName_{"interop-track"};
+  const std::string suffix_{std::to_string(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count())};
+  std::string trackNamespace_{"test-" + suffix_};
+  std::string trackName_{"interop-track-" + suffix_};
 };
 
 // Disabled: triggers segmentation fault in the test moxygen relay.

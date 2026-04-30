@@ -21,7 +21,11 @@ protected:
   TestResult execute() override;
 
 private:
-  std::string trackNamespace_{"test1/namespace"};
+  const std::string suffix_{std::to_string(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count())};
+  std::string trackNamespace_{"test-namespace-" + suffix_};
 };
 
 REGISTER_TEST(SubscribeNamespaceTest);
