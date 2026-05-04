@@ -133,8 +133,10 @@ else
 fi
 # Append -lz at the very end of the link command so that any static archive
 # (e.g. getdeps libunwind.a) that references uncompress() can resolve it even
-# after libz appears earlier in the link order.
-CMAKE_ARGS+=(-DCMAKE_EXE_LINKER_FLAGS="-lz")
+# after libz appears earlier in the link order, without overwriting any
+# existing executable linker flags supplied by the user or CI.
+EXE_LINKER_FLAGS="${CMAKE_EXE_LINKER_FLAGS:-}"
+CMAKE_ARGS+=("-DCMAKE_EXE_LINKER_FLAGS=${EXE_LINKER_FLAGS:+${EXE_LINKER_FLAGS} }-lz")
 
 echo "==> Configuring (build dir: ${BUILD_DIR})"
 "$CMAKE_BIN" "${CMAKE_ARGS[@]}"
