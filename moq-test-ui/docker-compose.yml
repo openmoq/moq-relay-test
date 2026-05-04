@@ -12,14 +12,15 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./certs:/etc/nginx/certs:ro
     depends_on:
-      - generic-runner
+      generic-runner:
+        condition: service_healthy
     networks:
       - internal
 
   # ── Generic Runner UI ─────────────────────────────────────────
   generic-runner:
-    build: .
-    image: generic-runner:latest
+    image: ${GENERIC_RUNNER_IMAGE:-ghcr.io/openmoq/moq-test-ui:latest}
+    pull_policy: always
     container_name: generic-runner
     restart: unless-stopped
     volumes:
@@ -34,6 +35,12 @@ services:
       - ./tools:/app/tools:ro
     environment:
       PORT: 3000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/tools >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - internal
 
