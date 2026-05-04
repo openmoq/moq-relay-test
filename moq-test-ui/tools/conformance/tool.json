@@ -1,0 +1,58 @@
+{
+  "name": "conformance",
+  "displayName": "MoQ Conformance",
+  "description": "Runs the MoQTest conformance test suite against a relay, verifying protocol compliance across forwarding preferences, object handling, extensions, and complex scenarios.",
+  "category": "conformance",
+  "docker": {
+    "image": "moq-interop:latest",
+    "entrypoint": ["/opt/moq/conformance/run_conformance.sh"],
+    "command": [],
+    "network": "host",
+    "extraHosts": ["host.docker.internal:host-gateway"]
+  },
+  "parameters": [
+    {
+      "id": "relay_url",
+      "label": "Relay URL",
+      "type": "url",
+      "required": true,
+      "default": "",
+      "placeholder": "https://relay.example.com/moq-relay",
+      "description": "Relay URL for conformance testing"
+    },
+    {
+      "id": "draft",
+      "label": "Draft Version",
+      "type": "select",
+      "options": [
+        { "value": "16", "label": "Draft 16" },
+        { "value": "14", "label": "Draft 14" }
+      ],
+      "default": "16"
+    },
+    {
+      "id": "transport",
+      "label": "Transport",
+      "type": "select",
+      "options": [
+        { "value": "Q", "label": "QUIC" },
+        { "value": "", "label": "WebTransport (H3)" }
+      ],
+      "default": "Q"
+    }
+  ],
+  "buildCommand": "{relay_url} {draft} {transport}",
+  "filters": [
+    { "id": "debug", "label": "Hide C++ debug logs", "pattern": "^[IE]\\d{4}\\s", "default": true },
+    { "id": "docker", "label": "Hide Docker build output", "pattern": "^\\[\\+\\]|^\\s*=>|^CACHED|^#\\d+|^Sending build|^Step\\s", "default": true }
+  ],
+  "renderer": "renderer.js",
+  "selfTest": {
+    "enabled": true,
+    "order": 3,
+    "defaults": {
+      "draft": "16",
+      "transport": "Q"
+    }
+  }
+}

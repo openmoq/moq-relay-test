@@ -1,0 +1,48 @@
+{
+  "name": "interop-tests",
+  "displayName": "MoQ Interop",
+  "description": "Runs the MoQ interoperability test suite against a relay, testing protocol-level operations like goaway, subscribe, publish, fetch, and error handling.",
+  "category": "conformance",
+  "docker": {
+    "image": "moq-interop:latest",
+    "command": [],
+    "network": "host",
+    "extraHosts": ["host.docker.internal:host-gateway"]
+  },
+  "parameters": [
+    {
+      "id": "relay_url",
+      "label": "Relay URL",
+      "type": "url",
+      "required": true,
+      "default": "",
+      "placeholder": "https://relay.example.com/moq-relay",
+      "description": "Relay URL for interop testing"
+    },
+    {
+      "id": "tests",
+      "label": "Tests to Run",
+      "type": "text",
+      "default": "",
+      "placeholder": "GoawayTest,MaxRequestIdTest (blank = all)",
+      "description": "Comma-separated test names, or blank to run all"
+    }
+  ],
+  "buildCommand": "--relay={relay_url} --tests={tests}",
+  "filters": [
+    { "id": "connect", "label": "Hide connection logs", "pattern": "^\\[connect\\]|Created Moq|URL parsed|certificate verifier|relay session|Cast successful", "default": true },
+    { "id": "fixture", "label": "Hide fixture logs", "pattern": "^\\s*\\[Fixture\\]", "default": false },
+    { "id": "cpp_errors", "label": "Hide C++ error logs", "pattern": "^E\\d{4}\\s", "default": true }
+  ],
+  "renderer": "renderer.js",
+  "selfTest": [
+    {
+      "enabled": true,
+      "order": 2,
+      "label": "Interop Tests (WebTransport)",
+      "defaults": {
+        "tests": "GoawayTest,MaxRequestIdTest,PublishNamespaceDoneTest,PublishNamespaceTest,PublishTest,SubscribeErrorTest,SubscribeNamespaceTest,SubscribeTest,SubscribeUpdateTest"
+      }
+    }
+  ]
+}
