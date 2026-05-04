@@ -43,8 +43,24 @@ while [[ $# -gt 0 ]]; do
         --tsan)          SANITIZE=thread ;;
         --ubsan)         SANITIZE=undefined ;;
         --clean)         CLEAN=1 ;;
-        --build-dir)     BUILD_DIR="$2"; shift ;;
-        --scratch-path)  SCRATCH_PATH="$2"; shift ;;
+        --build-dir)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --build-dir requires an argument" >&2
+                sed -n '2,21p' "$0"
+                exit 1
+            fi
+            BUILD_DIR="$2"
+            shift
+            ;;
+        --scratch-path)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --scratch-path requires an argument" >&2
+                sed -n '2,21p' "$0"
+                exit 1
+            fi
+            SCRATCH_PATH="$2"
+            shift
+            ;;
         -h|--help)
             sed -n '2,21p' "$0"
             exit 0 ;;

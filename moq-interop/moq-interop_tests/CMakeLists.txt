@@ -110,19 +110,23 @@ target_link_libraries(interop_tests PRIVATE
 )
 
 # Linux: libiberty provides cplus_demangle_v3_callback referenced by folly's
-# static archive.  libiberty-dev is installed in the Docker builder image;
-# on local Ubuntu/Debian: `apt install libiberty-dev`.
-# lzma / libunwind: getdeps libunwind.a is placed after liblzma.a in the
-# generated link command; when the system liblzma.so.5 is a DSO it must be
-# explicitly present on the command line when the archive that needs it is
-# processed.  --copy-dt-needed-entries tells ld to follow DT_NEEDED tags of
-# shared objects already on the command line, resolving the ABI symbol
-# lzma_stream_buffer_decode without requiring duplicate -llzma placement.
+# static archive.  Find it explicitly to fail fast if missing rather than at
+# link time. lzma / libunwind: getdeps libunwind.a is placed after liblzma.a;
+# when the system liblzma.so.5 is a DSO it must be explicitly linked.
+# --copy-dt-needed-entries (GNU ld) tells ld to follow DT_NEEDED tags of
+# shared objects, resolving symbols without duplicate library placement.
 if(UNIX AND NOT APPLE)
-    target_link_libraries(interop_tests PRIVATE iberty z)
-    target_link_options(interop_tests PRIVATE
-        -Wl,--copy-dt-needed-entries
-    )
+    find_library(IBERTY_LIBRARY iberty REQUIRED)
+    find_library(Z_LIBRARY z REQUIRED)
+    
+    target_link_libraries(interop_tests PRIVATE ${IBERTY_LIBRARY} ${Z_LIBRARY})
+    
+    # --copy-dt-needed-entries is a GNU ld feature; only apply on GNU/Clang toolchains
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_link_options(interop_tests PRIVATE
+            -Wl,--copy-dt-needed-entries
+        )
+    endif()
 endif()
 
 set_target_properties(interop_tests PROPERTIES

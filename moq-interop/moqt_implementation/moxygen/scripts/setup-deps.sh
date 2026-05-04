@@ -39,7 +39,15 @@ SCRATCH_PATH="${MOXYGEN_SCRATCH:-${PROJECT_ROOT}/.getdeps-scratch}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --clean)         CLEAN_FLAG="--clean" ;;
-    --scratch-path)  SCRATCH_PATH="$2"; shift ;;
+    --scratch-path)
+      if [[ $# -lt 2 ]]; then
+        echo "Error: --scratch-path requires an argument" >&2
+        sed -n '2,27p' "$0"
+        exit 1
+      fi
+      SCRATCH_PATH="$2"
+      shift
+      ;;
     -h|--help)       sed -n '2,27p' "$0"; exit 0 ;;
     *)               echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
@@ -115,6 +123,17 @@ patched = re.sub(
     flags=re.MULTILINE,
 )
 
+# Fallback: flexible pattern for any variation of setHandler call
+# Matches lines with setHandler regardless of exact whitespace/format
+if patched == content:
+    print("INFO: specific setHandler patterns did not match, trying flexible fallback...")
+    patched = re.sub(
+        r'^[ \t]*.*->setHandler\([^)]*\);[ \t]*\n',
+        '',
+        patched,
+        flags=re.MULTILINE,
+    )
+
 if patched == content:
     print("WARNING: setHandler patch did not match any known pattern — skipping")
 else:
@@ -154,17 +173,38 @@ path = sys.argv[1]
 with open(path) as f:
     src = f.read()
 
-patched = src.replace(
-    '#include <folly/system/os/linux.h>\n\n#include <linux/openat2.h>\n\n#include <folly/portability/SysSyscall.h>\n\nnamespace folly {\n\nlong linux_syscall_openat2(\n    int const dirfd,\n    char const* const pathname,\n    struct open_how const* const how) {\n  constexpr long no_openat2 =\n#if defined(__linux__) && defined(SYS_openat2)\n      SYS_openat2;\n#else\n      -1;\n#endif\n  return detail::linux_syscall(\n      no_openat2, dirfd, pathname, how, sizeof(struct open_how));\n}\n\n} // namespace folly',
-    '#include <folly/system/os/linux.h>\n\n#if defined(__linux__)\n#include <linux/openat2.h>\n#include <folly/portability/SysSyscall.h>\n\nnamespace folly {\n\nlong linux_syscall_openat2(\n    int const dirfd,\n    char const* const pathname,\n    struct open_how const* const how) {\n  constexpr long no_openat2 =\n#if defined(SYS_openat2)\n      SYS_openat2;\n#else\n      -1;\n#endif\n  return detail::linux_syscall(\n      no_openat2, dirfd, pathname, how, sizeof(struct open_how));\n}\n\n} // namespace folly\n\n#else // !defined(__linux__)\n\nnamespace folly {\n\n// openat2 is a Linux-only syscall; this stub satisfies the linker on macOS.\nlong linux_syscall_openat2(\n    int const /*dirfd*/,\n    char const* const /*pathname*/,\n    struct open_how const* const /*how*/) {\n  return -1;\n}\n\n} // namespace folly\n\n#endif // defined(__linux__)',
+# Try specific pattern first
+patched = re.sub(
+    r'(#include <folly/system/os/linux\.h>)\n\n(#include <linux/openat2\.h>)',
+    r'\1\n\n#if defined(__linux__)\n\2',
+    src,
+    count=1
 )
 
+# If specific pattern didn't work, try more flexible approach
 if patched == src:
-    print("  WARNING: folly linux.cpp patch did not apply (pattern not found)")
-else:
+    print("  INFO: specific pattern didn't match, trying flexible replacement...")
+    # Just wrap the single include line more flexibly
+    patched = re.sub(
+        r'(#include <linux/openat2\.h>)',
+        r'#if defined(__linux__)\n\1',
+        src,
+        count=1
+    )
+    # Add the closing endif at the end of the file or before the next major section
+    patched = re.sub(
+        r'(#include <linux/openat2\.h>\n)',
+        r'\1#endif // defined(__linux__)\n',
+        patched,
+        count=1
+    )
+
+if patched != src:
     with open(path, 'w') as f:
         f.write(patched)
     print("  patched:", path)
+else:
+    print("  WARNING: folly linux.cpp patch pattern not found (may already be patched or version mismatch)")
 PATCH_EOF
 fi
 

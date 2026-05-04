@@ -3,9 +3,11 @@
 #include "base/moqt_interface.h"
 #include "test_registry.h"
 #include <folly/coro/BlockingWait.h>
-#include <memory>
 #include <moxygen/MoQConsumers.h>
+#include <chrono>
+#include <memory>
 #include <string>
+#include <thread>
 
 namespace interop_test {
 
