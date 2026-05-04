@@ -40,6 +40,7 @@
 IMAGE     ?= moq-interop
 TAG       ?= latest
 REGISTRY  ?=
+PLATFORM  ?= linux/amd64
 
 ifeq ($(REGISTRY),)
   IMAGE_REF := $(IMAGE):$(TAG)
@@ -70,8 +71,13 @@ CONFORMANCE_URL_DOCKER := $(subst 127.0.0.1,host.docker.internal,$(subst localho
 # Auto-detect CPU count from the host so getdeps can parallelise its build.
 NPROC := $(shell nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
 
+
 # Pass --progress=plain here to get verbose (non-TTY) Docker build output.
 DOCKER_BUILD_FLAGS ?=
+
+# Platform override for cross-building (e.g., linux/amd64 on macOS)
+PLATFORM ?=
+PLATFORM_FLAG := $(if $(PLATFORM),--platform=$(PLATFORM),)
 
 # ── Paths ─────────────────────────────────────────────────────────────────────────────────────
 # Build context = the directory this Makefile lives in (moq-interop/).
@@ -93,7 +99,10 @@ all: tests
 # The build context is moq-interop/ (this directory).  .dockerignore in the
 # same directory excludes heavy artefacts (.scratch/, build/ dirs, etc.) so
 # only source files are transferred to the Docker daemon.
+
+
 build:
+ifeq ($(PLATFORM),)
 	$(DOCKER) build \
 		$(DOCKER_BUILD_FLAGS) \
 		--build-arg NPROC=$(NPROC) \
@@ -101,6 +110,16 @@ build:
 		-t $(IMAGE_REF) \
 		-f $(DOCKERFILE) \
 		$(BUILD_CTX)
+else
+	$(DOCKER) buildx build \
+		--platform=$(PLATFORM) \
+		$(DOCKER_BUILD_FLAGS) \
+		--build-arg NPROC=$(NPROC) \
+		--build-arg WITH_CONFORMANCE=$(WITH_CONFORMANCE) \
+		-t $(IMAGE_REF) \
+		-f $(DOCKERFILE) \
+		$(BUILD_CTX)
+endif
 
 
 # ── tests ─────────────────────────────────────────────────────────────────────────────
