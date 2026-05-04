@@ -17,7 +17,7 @@
 #
 # Examples:
 #   ./scripts/build.sh                  # RelWithDebInfo → build/
-#   ./scripts/build.sh --asan           # AddressSanitizer → build_asan/
+#   ./scripts/build.sh --asan           # AddressSanitizer → build_address/
 #   ./scripts/build.sh --clean          # wipe build dir first
 # =============================================================================
 
