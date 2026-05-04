@@ -3,7 +3,6 @@
 #include "test_registry.h"
 #include <memory>
 #include <string>
-#include <thread>
 
 namespace interop_test {
 
@@ -27,11 +26,15 @@ protected:
   TestResult execute() override;
 
 private:
-  std::string trackNamespace_{"test"};
-  std::string trackName_{"fetch-track"};
+  const std::string suffix_{std::to_string(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count())};
+  std::string trackNamespace_{"test-" + suffix_};
+  std::string trackName_{"fetch-track-" + suffix_};
 };
 
-// Auto-register this test
+// Disabled: not yet supported by relay under test. Re-enable when fixed.
 // REGISTER_TEST(FetchTest);
 
 TestResult FetchTest::execute() {
@@ -47,9 +50,6 @@ TestResult FetchTest::execute() {
   bool publishResult = publisher->publish(trackNamespace_, trackName_);
   assertTrue(publishResult, "Publish request should succeed");
   log("Publish successful");
-
-  // Give the relay time to process the publish request
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
   auto subscriber = fixture_->getSubscriber();
   assertNotNull(subscriber.get(), "Subscriber interface should not be null");

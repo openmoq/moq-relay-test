@@ -5,7 +5,6 @@
 #include <memory>
 #include <moxygen/MoQConsumers.h>
 #include <string>
-#include <thread>
 
 namespace interop_test {
 
@@ -31,8 +30,12 @@ protected:
   TestResult execute() override;
 
 private:
-  std::string trackNamespace_{"test"};
-  std::string trackName_{"interop-track"};
+  const std::string suffix_{std::to_string(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count())};
+  std::string trackNamespace_{"test-" + suffix_};
+  std::string trackName_{"interop-track-" + suffix_};
 };
 
 // Auto-register this test
@@ -51,9 +54,6 @@ TestResult SubscribeTest::execute() {
   bool publishResult = publisher->publish(trackNamespace_, trackName_);
   assertTrue(publishResult, "Publish request should succeed");
   log("Publish successful");
-
-  // Give the relay time to process the publish request
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
   // Subscribe to the track from a different connection
   log("Subscribing to track");

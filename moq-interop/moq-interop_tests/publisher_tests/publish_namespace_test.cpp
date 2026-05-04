@@ -24,7 +24,11 @@ protected:
   TestResult execute() override;
 
 private:
-  std::string trackNamespace_{"test/namespace"};
+  const std::string suffix_{std::to_string(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count())};
+  std::string trackNamespace_{"test-namespace-" + suffix_};
 };
 
 REGISTER_TEST(PublishNamespaceTest);
@@ -39,7 +43,7 @@ TestResult PublishNamespaceTest::execute() {
 
   // Send announce request
   log("Sending announce request...");
-  bool announceResult = publisher->publish_namespace(trackNamespace_);
+  bool announceResult = publisher->publishNamespace(trackNamespace_);
 
   // Verify announce succeeded
   assertTrue(announceResult, "Announce request should succeed");

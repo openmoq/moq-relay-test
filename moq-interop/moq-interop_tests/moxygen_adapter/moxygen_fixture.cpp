@@ -1,9 +1,9 @@
 #include "moxygen_fixture.h"
+#include <glog/logging.h>
 #include "base/base_test.h"
 #include <folly/coro/BlockingWait.h>
 #include <iostream>
 #include <moxygen/MoQSession.h>
-#include <thread>
 
 namespace interop_test {
 
@@ -17,7 +17,7 @@ void MoxygenTestFixture::setUp() {
 }
 
 void MoxygenTestFixture::tearDown() {
-  std::cout << "  [Fixture] Starting cleanup..." << std::endl;
+  LOG(INFO) << "  [Fixture] Starting cleanup...";
 
   // Clean up all additional interfaces
   for (auto &interface : additionalInterfaces_) {
@@ -35,25 +35,24 @@ void MoxygenTestFixture::tearDown() {
     cleanupInterface(publisher_, "publisher");
   }
 
-  std::cout << "  [Fixture] Cleanup completed" << std::endl;
+  LOG(INFO) << "  [Fixture] Cleanup completed";
 }
 
 std::shared_ptr<MoqtInterface> MoxygenTestFixture::getPublisher() {
   if (!publisher_) {
-    std::cout << "  [Fixture] Creating publisher connection..." << std::endl;
+    LOG(INFO) << "  [Fixture] Creating publisher connection...";
     publisher_ = std::make_shared<MoxygenInterface>(eventBase_);
 
     try {
       bool connected = publisher_->connect(relayUrl_);
       if (!connected) {
-        std::cerr << "  [Fixture] Failed to connect publisher" << std::endl;
+        LOG(ERROR) << "  [Fixture] Failed to connect publisher";
         publisher_.reset();
         throw std::runtime_error("Failed to establish publisher connection");
       }
-      std::cout << "  [Fixture] Publisher connected successfully" << std::endl;
+      LOG(INFO) << "  [Fixture] Publisher connected successfully";
     } catch (const std::exception &ex) {
-      std::cerr << "  [Fixture] Exception connecting publisher: " << ex.what()
-                << std::endl;
+      LOG(ERROR) << "  [Fixture] Exception connecting publisher: " << ex.what();
       publisher_.reset();
       throw;
     }
@@ -64,20 +63,19 @@ std::shared_ptr<MoqtInterface> MoxygenTestFixture::getPublisher() {
 
 std::shared_ptr<MoqtInterface> MoxygenTestFixture::getSubscriber() {
   if (!subscriber_) {
-    std::cout << "  [Fixture] Creating subscriber connection..." << std::endl;
+    LOG(INFO) << "  [Fixture] Creating subscriber connection...";
     subscriber_ = std::make_shared<MoxygenInterface>(eventBase_);
 
     try {
       bool connected = subscriber_->connect(relayUrl_);
       if (!connected) {
-        std::cerr << "  [Fixture] Failed to connect subscriber" << std::endl;
+        LOG(ERROR) << "  [Fixture] Failed to connect subscriber";
         subscriber_.reset();
         throw std::runtime_error("Failed to establish subscriber connection");
       }
-      std::cout << "  [Fixture] Subscriber connected successfully" << std::endl;
+      LOG(INFO) << "  [Fixture] Subscriber connected successfully";
     } catch (const std::exception &ex) {
-      std::cerr << "  [Fixture] Exception connecting subscriber: " << ex.what()
-                << std::endl;
+      LOG(ERROR) << "  [Fixture] Exception connecting subscriber: " << ex.what();
       subscriber_.reset();
       throw;
     }
@@ -88,7 +86,7 @@ std::shared_ptr<MoqtInterface> MoxygenTestFixture::getSubscriber() {
 
 std::shared_ptr<MoqtInterface>
 MoxygenTestFixture::createMoQInterface(bool autoConnect) {
-  std::cout << "\n[INTERFACE] Creating new MoQ interface..." << std::endl;
+  LOG(INFO) << "\n[INTERFACE] Creating new MoQ interface...";
 
   auto interface = std::make_shared<MoxygenInterface>(eventBase_);
 
@@ -96,14 +94,12 @@ MoxygenTestFixture::createMoQInterface(bool autoConnect) {
     try {
       bool connected = interface->connect(relayUrl_);
       if (!connected) {
-        std::cerr << "  [Fixture] Failed to connect new interface" << std::endl;
+        LOG(ERROR) << "  [Fixture] Failed to connect new interface";
         throw std::runtime_error("Failed to establish connection");
       }
-      std::cout << "  [Fixture] New interface connected successfully"
-                << std::endl;
+      LOG(INFO) << "  [Fixture] New interface connected successfully";
     } catch (const std::exception &ex) {
-      std::cerr << "  [Fixture] Exception connecting interface: " << ex.what()
-                << std::endl;
+      LOG(ERROR) << "  [Fixture] Exception connecting interface: " << ex.what();
       throw;
     }
   }
@@ -116,14 +112,14 @@ MoxygenTestFixture::createMoQInterface(bool autoConnect) {
 
 void MoxygenTestFixture::resetPublisher() {
   if (publisher_) {
-    std::cout << "  [Fixture] Resetting publisher..." << std::endl;
+    LOG(INFO) << "  [Fixture] Resetting publisher...";
     cleanupInterface(publisher_, "publisher");
   }
 }
 
 void MoxygenTestFixture::resetSubscriber() {
   if (subscriber_) {
-    std::cout << "  [Fixture] Resetting subscriber..." << std::endl;
+    LOG(INFO) << "  [Fixture] Resetting subscriber...";
     cleanupInterface(subscriber_, "subscriber");
   }
 }
@@ -137,7 +133,7 @@ void MoxygenTestFixture::cleanupInterface(std::shared_ptr<MoxygenInterface> &int
   try {
     auto client = interface->getClient();
     if (eventBase_ && client && client->moqSession_) {
-      std::cout << "  [Fixture] Closing " << name << " session..." << std::endl;
+      LOG(INFO) << "  [Fixture] Closing " << name << " session...";
       eventBase_->runImmediatelyOrRunInEventBaseThreadAndWait([client,
                                                                &name]() {
         try {
@@ -145,25 +141,23 @@ void MoxygenTestFixture::cleanupInterface(std::shared_ptr<MoxygenInterface> &int
           // to avoid use-after-free if goaway already closed it
           if (client && client->moqSession_) {
             client->moqSession_->close(moxygen::SessionCloseErrorCode::NO_ERROR);
-            std::cout << "  [Fixture] " << name << " session closed" << std::endl;
+            LOG(INFO) << "  [Fixture] " << name << " session closed";
           } else {
-            std::cout << "  [Fixture] " << name << " session already closed" << std::endl;
+            LOG(INFO) << "  [Fixture] " << name << " session already closed";
           }
         } catch (const std::exception &ex) {
-          std::cerr << "  [Fixture] Exception closing " << name
-                    << " session: " << ex.what() << std::endl;
+          LOG(ERROR) << "  [Fixture] Exception closing " << name
+                    << " session: " << ex.what();
         }
       });
-      // Give time for graceful shutdown
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
   } catch (const std::exception &ex) {
-    std::cerr << "  [Fixture] Exception during " << name
-              << " cleanup: " << ex.what() << std::endl;
+    LOG(ERROR) << "  [Fixture] Exception during " << name
+              << " cleanup: " << ex.what();
   }
 
   interface.reset();
-  std::cout << "  [Fixture] " << name << " interface reset" << std::endl;
+  LOG(INFO) << "  [Fixture] " << name << " interface reset";
 }
 
 } // namespace interop_test

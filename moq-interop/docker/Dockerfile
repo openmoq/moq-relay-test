@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # =============================================================================
 # moq-interop — Multi-stage Docker build
 #
@@ -89,8 +88,12 @@ RUN apt-get update && \
 # binding capture strictness that clang-14 enforces.
 ENV CC=gcc CXX=g++
 
-# All sources live here; this path is embedded in the getdeps scratch-dir hash
-# so it must stay stable across builds.
+# Deterministic getdeps scratch path (sources, build dirs, install prefix).
+# Both setup-deps.sh and build.sh honor MOXYGEN_SCRATCH and pass --scratch-path
+# to every getdeps invocation.  This path is mounted as a BuildKit persistent
+# cache below so the 30–60 min cold compile is paid only once.
+ENV MOXYGEN_SCRATCH=/var/cache/getdeps
+
 WORKDIR /workspace
 
 # ── Layer 2 — moxygen submodule ───────────────────────────────────────────────────────
@@ -101,56 +104,56 @@ COPY moqt_implementation/moxygen/scripts/ ./moqt_implementation/moxygen/scripts/
 # ── Layer 3 — Meta OSS deps + moxygen (BuildKit persistent cache) ────────────
 # getdeps.py fetches, patches, and compiles:
 #   folly → fizz → wangle → mvfst → proxygen → moxygen
-# All artefacts go into GETDEPS_CACHE which is mounted as a BuildKit
+# All artefacts go into ${MOXYGEN_SCRATCH} which is mounted as a BuildKit
 # persistent cache volume.  This volume survives across ALL builds regardless
-# of whether earlier Dockerfile layers changed, so the 30-60 min compile is
+# of whether earlier Dockerfile layers changed, so the 30–60 min compile is
 # paid only once (cold) and never again unless the moxygen submodule changes.
 #
-# We also compile the moqtest tooling here and copy the binaries into a regular
-# Docker layer path (/opt/moq/moxygen-tools/) so Layer 6 can stage them
-# independently of whether the BuildKit volume is intact.
-RUN --mount=type=cache,id=moq-interop-getdeps,target=/tmp/fbcode_builder_getdeps-ZworkspaceZmoqt_implementationZmoxygenZmoxygenZbuildZfbcode_builder-root,sharing=locked \
+# When WITH_CONFORMANCE=1 (default) we also build moqtest_client and
+# moqtest_server from the moxygen samples.  Both are needed by the conformance
+# target: moqtest_server connects to the relay as a publisher and
+# moqtest_client probes it.
+RUN --mount=type=cache,id=moq-interop-getdeps-v2,target=/var/cache/getdeps,sharing=locked \
     set -e; \
     cd /workspace/moqt_implementation/moxygen && bash scripts/setup-deps.sh; \
-    cd moxygen; \
-    GETDEPS="./build/fbcode_builder/getdeps.py"; \
-    eval "$(python3 $GETDEPS env moxygen)"; \
-    BUILD_DIR="$(python3 $GETDEPS show-build-dir moxygen 2>/dev/null | tail -1)"; \
-    echo "==> moxygen build dir: ${BUILD_DIR}"; \
-    if [ -z "$BUILD_DIR" ] || [ ! -d "$BUILD_DIR" ]; then \
-        echo "ERROR: moxygen build dir not found" >&2; exit 1; \
-    fi; \
-    echo "==> Configuring moxygen with BUILD_SAMPLES=ON..."; \
-    cmake "$BUILD_DIR" -DBUILD_SAMPLES=ON; \
-    echo "==> Building moqtest_client and moqtest_server..."; \
-    cmake --build "$BUILD_DIR" --target moqtest_client moqtest_server -- -j${NPROC}; \
     mkdir -p /opt/moq/moxygen-tools; \
-    cp "${BUILD_DIR}/moxygen/moqtest/moqtest_client" /opt/moq/moxygen-tools/moqtest_client; \
-    cp "${BUILD_DIR}/moxygen/moqtest/moqtest_server" /opt/moq/moxygen-tools/moqtest_server 2>/dev/null || \
-        echo "WARNING: moqtest_server not built (will be absent from image)"; \
-    echo "==> moqtest tooling pre-staged to /opt/moq/moxygen-tools/"; \
-    ls -la /opt/moq/moxygen-tools/
+    if [ "${WITH_CONFORMANCE}" = "1" ]; then \
+        cd /workspace/moqt_implementation/moxygen/moxygen; \
+        GETDEPS="./build/fbcode_builder/getdeps.py"; \
+        eval "$(python3 $GETDEPS --scratch-path "$MOXYGEN_SCRATCH" --install-prefix "$MOXYGEN_SCRATCH/installed" env moxygen)"; \
+        echo "==> Building moqtest_client and moqtest_server from workspace source..."; \
+        mkdir -p /tmp/moqtest-build; \
+        cmake -S /workspace/moqt_implementation/moxygen/moxygen \
+              -B /tmp/moqtest-build \
+              -DBUILD_SAMPLES=ON \
+              -DBUILD_TESTS=OFF; \
+        cmake --build /tmp/moqtest-build --target moqtest_client moqtest_server -- -j${NPROC}; \
+        cp /tmp/moqtest-build/moxygen/moqtest/moqtest_client /opt/moq/moxygen-tools/moqtest_client; \
+        cp /tmp/moqtest-build/moxygen/moqtest/moqtest_server /opt/moq/moxygen-tools/moqtest_server; \
+        echo "==> moqtest tooling pre-staged to /opt/moq/moxygen-tools/"; \
+        ls -la /opt/moq/moxygen-tools/; \
+    else \
+        echo "==> WITH_CONFORMANCE=0: skipping moqtest tooling build."; \
+    fi
 
 # ── Layer 4 — interop tests source (changes frequently, cheap to rebuild) ────
 COPY moq-interop_tests/ ./moq-interop_tests/
 
 # ── Layer 5 — build interop_tests binary and stage it ───────────────────────
-# setup-deps generates ~2 MiB of verbose getdeps/Boost output that clips the
-# log before configure/link errors become visible.  We redirect it to a file;
-# on failure the last 60 lines are printed so the actual error is always shown.
-RUN --mount=type=cache,id=moq-interop-getdeps,target=/tmp/fbcode_builder_getdeps-ZworkspaceZmoqt_implementationZmoxygenZmoxygenZbuildZfbcode_builder-root,sharing=locked \
+# build.sh emits ~2 MiB of verbose getdeps/cmake output that clips the log
+# before configure/link errors become visible.  Redirect to a file; on failure
+# the last 80 lines are printed so the actual error is always shown.
+RUN --mount=type=cache,id=moq-interop-getdeps-v2,target=/var/cache/getdeps,sharing=locked \
     set -e; \
-    GETDEPS_INSTALLED="/tmp/fbcode_builder_getdeps-ZworkspaceZmoqt_implementationZmoxygenZmoxygenZbuildZfbcode_builder-root/installed"; \
-    if [ -z "$(ls "$GETDEPS_INSTALLED"/folly/lib/libfolly.* 2>/dev/null)" ]; then \
+    if [ -z "$(ls "$MOXYGEN_SCRATCH"/installed/folly/lib/libfolly.* 2>/dev/null)" ]; then \
         echo "==> BuildKit cache was evicted — re-running setup-deps.sh to repopulate..."; \
         cd /workspace/moqt_implementation/moxygen && bash scripts/setup-deps.sh; \
     else \
         echo "==> getdeps cache intact, skipping setup-deps.sh"; \
     fi; \
     cd /workspace/moq-interop_tests; \
-    echo "==> docker/CMakeLists.txt: $(ls /workspace/moq-interop_tests/docker/CMakeLists.txt)"; \
-    bash scripts/build.sh docker > /tmp/build-docker.log 2>&1 || { echo "==> build.sh docker FAILED:"; tail -80 /tmp/build-docker.log; exit 1; }; \
-    echo "==> build.sh docker succeeded. Last configure/build lines:"; \
+    bash scripts/build.sh > /tmp/build-docker.log 2>&1 || { echo "==> build.sh FAILED:"; tail -80 /tmp/build-docker.log; exit 1; }; \
+    echo "==> build.sh succeeded. Last configure/build lines:"; \
     tail -20 /tmp/build-docker.log; \
     mkdir -p /opt/moq/bin /opt/moq/lib; \
     cp /workspace/moq-interop_tests/build/bin/interop_tests /opt/moq/bin/interop_tests; \
@@ -158,7 +161,7 @@ RUN --mount=type=cache,id=moq-interop-getdeps,target=/tmp/fbcode_builder_getdeps
     patchelf --remove-rpath /opt/moq/bin/interop_tests; \
     echo "==> Staging glog/gflags (.so files):"; \
     for pattern in "glog*/lib/libglog.so*" "gflags*/lib/libgflags.so*"; do \
-        find /tmp/fbcode_builder_getdeps-*/installed/ -path "*/${pattern}" 2>/dev/null | while read f; do \
+        find "$MOXYGEN_SCRATCH"/installed/ -path "*/${pattern}" 2>/dev/null | while read f; do \
             cp -L "$f" "/opt/moq/lib/$(basename "$f")" && echo "  staged: $(basename "$f")" || true; \
         done; \
     done; \
@@ -186,20 +189,22 @@ RUN set -e; \
         cp "${TOOLS}/moqtest_client" /opt/moq/moxygen/moqtest/moqtest_client; \
         chmod +x /opt/moq/moxygen/moqtest/moqtest_client; \
         patchelf --remove-rpath /opt/moq/moxygen/moqtest/moqtest_client; \
-        if [ -x "${TOOLS}/moqtest_server" ]; then \
-            echo "==> Staging moqtest_server from ${TOOLS}/moqtest_server"; \
-            cp "${TOOLS}/moqtest_server" /opt/moq/moxygen/moqtest/moqtest_server; \
-            chmod +x /opt/moq/moxygen/moqtest/moqtest_server; \
-            patchelf --remove-rpath /opt/moq/moxygen/moqtest/moqtest_server; \
-        else \
-            echo "WARNING: moqtest_server not found — relay-mode conformance unavailable" >&2; \
+        if [ ! -x "${TOOLS}/moqtest_server" ]; then \
+            echo "ERROR: moqtest_server not found at ${TOOLS}/moqtest_server." >&2; \
+            echo "  This means the moxygen build layer did not produce moqtest_server." >&2; \
+            echo "  Rebuild with --no-cache to trigger a full getdeps rebuild." >&2; \
+            exit 1; \
         fi; \
+        echo "==> Staging moqtest_server from ${TOOLS}/moqtest_server"; \
+        cp "${TOOLS}/moqtest_server" /opt/moq/moxygen/moqtest/moqtest_server; \
+        chmod +x /opt/moq/moxygen/moqtest/moqtest_server; \
+        patchelf --remove-rpath /opt/moq/moxygen/moqtest/moqtest_server; \
         cp /workspace/moqt_implementation/moxygen/moxygen/moxygen/moqtest/conformance_test.sh \
            /opt/moq/conformance/conformance_test.sh; \
         chmod +x /opt/moq/conformance/conformance_test.sh; \
         echo "==> Conformance tooling staged."; \
     else \
-        echo "==> WITH_CONFORMANCE=0: skipping moqtest_client and conformance_test.sh."; \
+        echo "==> WITH_CONFORMANCE=0: skipping moqtest tooling and conformance_test.sh."; \
     fi
 
 # =============================================================================

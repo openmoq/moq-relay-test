@@ -33,12 +33,16 @@ protected:
   TestResult execute() override;
 
 private:
-  std::string trackNamespace_{"test"};
-  std::string trackName_{"interop-track"};
+  const std::string suffix_{std::to_string(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count())};
+  std::string trackNamespace_{"test-" + suffix_};
+  std::string trackName_{"interop-track-" + suffix_};
 };
 
-// Auto-register this test
-// This leads to segmentation fault in the test moxygen relay. Will enable after fixing the issue.
+// Disabled: triggers segmentation fault in the test moxygen relay.
+// Re-enable after the relay issue is fixed.
 // REGISTER_TEST(SubscribeUpdateErrorTest);
 
 TestResult SubscribeUpdateErrorTest::execute() {

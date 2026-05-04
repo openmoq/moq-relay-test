@@ -24,24 +24,32 @@ protected:
   TestResult execute() override;
 
 private:
-  std::string trackNamespace_{"test/namespace"};
+  const std::string suffix_{std::to_string(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count())};
+  std::string trackNamespace_{"test-namespace-" + suffix_};
 };
 
 REGISTER_TEST(PublishNamespaceDoneTest);
 
 TestResult PublishNamespaceDoneTest::execute() {
-  log("Publishing namespace done: " + trackNamespace_);
+  log("Publishing namespace then done: " + trackNamespace_);
 
   // Get publisher connection from fixture
   auto publisher = fixture_->getPublisher();
   assertNotNull(publisher.get(), "Publisher interface should not be null");
   assertTrue(publisher->isConnected(), "Publisher should be connected");
 
-  // Send publish done request
-  log("Sending publish done request...");
-  bool publishDoneResult = publisher->publish_namespace_done(trackNamespace_);
+  // Must announce the namespace before sending done
+  log("Sending announce request...");
+  bool announceResult = publisher->publishNamespace(trackNamespace_);
+  assertTrue(announceResult, "Publish namespace request should succeed");
+  log("Announce successful");
 
-  // Verify publish done succeeded
+  // Now signal that the namespace announcement is complete
+  log("Sending publish namespace done request...");
+  bool publishDoneResult = publisher->publishNamespaceDone(trackNamespace_);
   assertTrue(publishDoneResult,
              "Publish namespace done request should succeed");
   log("Publish namespace done successful");

@@ -3,4 +3,5 @@ interop_tests/build/
 .vscode/*
 **/moxygen/certs/
 **/.scratch/
+**/.getdeps-scratch/
 .DS_Store

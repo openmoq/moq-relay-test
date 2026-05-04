@@ -9,17 +9,9 @@
 
 namespace interop_test {
 
-// Utility function to create mock data buffers
-inline std::unique_ptr<folly::IOBuf> makeMockData(uint32_t size) {
-  auto buf = folly::IOBuf::create(size);
-  buf->append(size);
-  // Fill with pattern for debugging
-  auto data = buf->writableData();
-  for (uint32_t i = 0; i < size; ++i) {
-    data[i] = static_cast<uint8_t>('A' + (i % 26));
-  }
-  return buf;
-}
+// Utility function to create a mock data buffer of `size` bytes filled with a
+// repeating ASCII pattern (defined in moxygen_mocks.cpp).
+std::unique_ptr<folly::IOBuf> makeMockData(uint32_t size);
 
 // Utility function to send mock data via TrackConsumer
 // Sends 3 groups with 2 objects each using beginSubgroup pattern

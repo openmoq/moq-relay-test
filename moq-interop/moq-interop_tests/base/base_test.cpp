@@ -1,4 +1,5 @@
 #include "base_test.h"
+#include <glog/logging.h>
 #include <iostream>
 
 namespace interop_test {
@@ -17,6 +18,14 @@ TestResult BaseTest::run() {
     setUp();
     if (fixture_) {
       fixture_->setUp();
+    }
+
+    // Sanity check: test fixture must be set before execution
+    if (!fixture_) {
+      setError("Test fixture is not set. "
+               "This likely indicates WITH_MOXYGEN_ADAPTER was not defined at compile time.");
+      logAlways("Test ERROR: " + lastError_);
+      return TestResult::ERROR;
     }
 
     // Execute phase
@@ -46,8 +55,7 @@ TestResult BaseTest::run() {
         fixture_->tearDown();
       }
     } catch (const std::exception &teardownEx) {
-      std::cerr << "Exception during teardown: " << teardownEx.what()
-                << std::endl;
+      LOG(ERROR) << "Exception during teardown: " << teardownEx.what();
     }
 
     setError(std::string("Exception: ") + ex.what());
