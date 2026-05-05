@@ -1,0 +1,61 @@
+{
+  "name": "probe",
+  "displayName": "Relay Probe",
+  "description": "Probes relay endpoints for liveness, supported drafts, transport types, and latency.",
+  "category": "diagnostics",
+  "docker": {
+    "image": "ghcr.io/gmarzot/aiomoqt:0.8.2",
+    "entrypoint": ["/bin/sh", "-c"],
+    "command": ["python /app/aiomoqt/examples/relay_probe.py -f /tmp/relays.json -o /tmp/probe_out.json --once && cat /tmp/probe_out.json && echo"],
+    "network": "host"
+  },
+  "prepareFiles": [
+    {
+      "containerPath": "/tmp/relays.json",
+      "generator": "relay-probe-endpoints"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "relay_url",
+      "label": "Relay URL",
+      "type": "url",
+      "required": true,
+      "default": "",
+      "placeholder": "https://relay.example.com/moq-relay",
+      "description": "MoQT relay endpoint to probe"
+    },
+    {
+      "id": "transport",
+      "label": "Transport",
+      "type": "select",
+      "default": "both",
+      "options": [
+        { "value": "both", "label": "QUIC + WebTransport" },
+        { "value": "quic", "label": "QUIC only" },
+        { "value": "wt",   "label": "WebTransport only" }
+      ]
+    },
+    {
+      "id": "timeout",
+      "label": "Timeout (seconds)",
+      "type": "number",
+      "default": 10,
+      "min": 1,
+      "max": 60
+    }
+  ],
+  "buildCommand": "",
+  "filters": [
+    { "id": "debug", "label": "Hide debug output", "pattern": "^\\[DEBUG\\]|^D\\d{4}", "default": true }
+  ],
+  "renderer": "renderer.js",
+  "selfTest": {
+    "enabled": true,
+    "order": 1,
+    "defaults": {
+      "transport": "both",
+      "timeout": 15
+    }
+  }
+}

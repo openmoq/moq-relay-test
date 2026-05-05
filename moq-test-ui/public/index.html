@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MoQ Test Runner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@100..900&family=Lexend:wght@100..900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+</head>
+<body>
+  <header>
+    <a href="/" class="header-logo" aria-label="OpenMOQ home">
+      <img src="/assets/openmoq-logo.svg" alt="OpenMOQ" height="26" />
+    </a>
+    <span class="header-title">Test Tools</span>
+    <nav>
+      <button class="nav-btn active" data-view="tools">Tools</button>
+      <button class="nav-btn" data-view="self-test">Automated Tests</button>
+      <button class="nav-btn" data-view="history">History</button>
+    </nav>
+    <div id="connection-status" class="status-dot disconnected" title="Disconnected"></div>
+  </header>
+
+  <main>
+    <!-- Tools View -->
+    <section id="view-tools" class="view active">
+      <div class="layout">
+        <aside id="tool-sidebar">
+          <h2>Select Tool</h2>
+          <div id="tool-list"></div>
+          <div id="active-runs">
+            <h3>Active Runs</h3>
+            <div id="active-runs-list"></div>
+          </div>
+        </aside>
+
+        <div id="tool-workspace">
+          <div id="no-tool-selected" class="placeholder">
+            <p>Select a tool from the sidebar to begin</p>
+          </div>
+
+          <div id="tool-panel" class="hidden">
+            <div class="tool-header">
+              <h2 id="tool-title"></h2>
+              <p id="tool-description"></p>
+            </div>
+
+            <div id="param-form-container">
+              <form id="param-form"></form>
+              <div class="form-actions">
+                <button id="btn-run" class="btn btn-primary">Run</button>
+                <button id="btn-stop" class="btn btn-danger hidden">Stop</button>
+              </div>
+            </div>
+
+            <div id="output-section" class="hidden">
+              <div class="output-header">
+                <h3>Output</h3>
+                <div id="filter-toggles"></div>
+                <button id="btn-clear-output" class="btn btn-small">Clear</button>
+              </div>
+              <div id="output-panels">
+                <div id="renderer-container" class="hidden"></div>
+                <div id="terminal-container"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Self-Test View -->
+    <section id="view-self-test" class="view hidden">
+      <div class="self-test-layout">
+        <div class="self-test-config">
+          <h2>Relay Self-Test</h2>
+          <p>Run all tools against a relay to verify its health and conformance.</p>
+          <form id="self-test-form">
+            <div class="form-group">
+              <label for="st-relay-url">Relay URL</label>
+              <input type="text" id="st-relay-url" required placeholder="moqt://relay.example.com">
+            </div>
+            <div class="form-group">
+              <label for="st-transport">Transport</label>
+              <select id="st-transport">
+                <option value="Q">QUIC</option>
+                <option value="WT">WebTransport (H3)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="st-draft">Draft Version</label>
+              <select id="st-draft">
+                <option value="16">Draft 16</option>
+                <option value="14">Draft 14</option>
+              </select>
+            </div>
+            <div class="form-actions">
+              <button type="submit" id="btn-self-test-run" class="btn btn-primary">Run Self-Test</button>
+              <button type="button" id="btn-self-test-stop" class="btn btn-danger hidden">Stop</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="self-test-results">
+          <h3>Tool Progress</h3>
+          <div id="self-test-tool-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- History View -->
+    <section id="view-history" class="view hidden">
+      <h2>Run History</h2>
+      <div class="history-controls">
+        <select id="history-tool-filter">
+          <option value="">All Tools</option>
+        </select>
+        <button id="btn-refresh-history" class="btn btn-small">Refresh</button>
+      </div>
+      <table id="history-table">
+        <thead>
+          <tr>
+            <th>Tool</th>
+            <th>Started</th>
+            <th>Exit Code</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

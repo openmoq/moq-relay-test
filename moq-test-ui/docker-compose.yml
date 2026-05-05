@@ -1,0 +1,49 @@
+services:
+
+  # ── Reverse proxy – sole container exposed to the internet ────
+  nginx:
+    image: nginx:alpine
+    container_name: runner-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      generic-runner:
+        condition: service_healthy
+    networks:
+      - internal
+
+  # ── Generic Runner UI ─────────────────────────────────────────
+  generic-runner:
+    image: ${GENERIC_RUNNER_IMAGE:-ghcr.io/openmoq/moq-test-ui:latest}
+    pull_policy: always
+    container_name: generic-runner
+    restart: unless-stopped
+    volumes:
+      # Mount Docker socket for spawning sibling tool containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Shared temp dir: must be a real host path so Docker daemon can bind-mount
+      # files into sibling containers (os.tmpdir() inside the container won't work)
+      - /tmp/generic-runner:/tmp/generic-runner
+      # Persist results
+      - ./results:/app/results
+      # Allow tool definition hot-reloading (optional)
+      - ./tools:/app/tools:ro
+    environment:
+      PORT: 3000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/tools >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge

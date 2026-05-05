@@ -1,0 +1,19 @@
+{
+  "name": "generic-runner",
+  "version": "1.0.0",
+  "description": "Generic web UI for running Docker-based CLI tools with real-time streaming",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": ["moq", "test", "runner", "docker", "streaming"],
+  "license": "ISC",
+  "dependencies": {
+    "dockerode": "^4.0.4",
+    "express": "^4.21.2",
+    "uuid": "^11.1.0",
+    "ws": "^8.18.0"
+  }
+}
