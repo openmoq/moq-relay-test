@@ -32,7 +32,7 @@ services:
       # Persist results
       - ./results:/app/results
       # Allow tool definition hot-reloading (optional)
-      - ./tools:/app/tools:ro
+      #- ./tools:/app/tools:ro
     environment:
       PORT: 3000
     healthcheck:
