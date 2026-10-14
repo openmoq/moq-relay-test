@@ -1,0 +1,69 @@
+{
+  "name": "conformance-latest",
+  "displayName": "Moxygen Conformance (latest)",
+  "description": "Runs the latest MoQTest conformance suite (https://github.com/facebookexperimental/moxygen/blob/main/moxygen/moqtest/conformance_test.sh) against a relay using MoQT draft 18.",
+  "category": "conformance",
+  "order": 4,
+  "forceUrlScheme": "https",
+  "docker": {
+    "image": "ghcr.io/openmoq/moq-interop:v0.2.0",
+    "entrypoint": ["/opt/moq/conformance/run_conformance.sh"],
+    "command": [],
+    "network": "host",
+    "extraHosts": ["host.docker.internal:host-gateway"]
+  },
+  "parameters": [
+    {
+      "id": "relay_url",
+      "label": "Relay URL",
+      "type": "url",
+      "required": true,
+      "default": "",
+      "placeholder": "https://relay.example.com/moq-relay",
+      "description": "Relay URL for conformance testing"
+    },
+    {
+      "id": "draft",
+      "label": "Draft Version",
+      "type": "select",
+      "options": [
+        { "value": "18", "label": "Draft 18" }
+      ],
+      "default": "18"
+    },
+    {
+      "id": "transport",
+      "label": "Transport",
+      "type": "select",
+      "options": [
+        { "value": "quic", "label": "QUIC" },
+        { "value": "wt", "label": "WebTransport (H3)" },
+        { "value": "qmux", "label": "QMUX-on-TCP" }
+      ],
+      "default": "wt",
+      "transportFlagMap": { "quic": "Q", "wt": "", "qmux": "X" }
+    }
+  ],
+  "buildCommand": "{relay_url} {draft} {transport}",
+  "filters": [
+    { "id": "debug", "label": "Hide C++ debug logs", "pattern": "^[IE]\\d{4}\\s", "default": true },
+    { "id": "docker", "label": "Hide Docker build output", "pattern": "^\\[\\+\\]|^\\s*=>|^CACHED|^#\\d+|^Sending build|^Step\\s", "default": true }
+  ],
+  "renderer": "renderer.js",
+  "selfTest": [
+    {
+      "enabled": true,
+      "order": 9,
+      "label": "MOQ Conformance latest (QUIC)",
+      "selfTestTransport": "Q",
+      "selfTestDrafts": ["18"]
+    },
+    {
+      "enabled": true,
+      "order": 10,
+      "label": "MOQ Conformance latest (WebTransport)",
+      "selfTestTransport": "WT",
+      "selfTestDrafts": ["18"]
+    }
+  ]
+}

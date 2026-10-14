@@ -47,6 +47,7 @@
     "enabled": true,
     "order": 2,
     "selfTestTransport": "all",
+    "selfTestDrafts": ["14", "16", "18"],
     "defaults": {
       "transport": "both"
     }

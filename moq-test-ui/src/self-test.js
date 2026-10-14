@@ -22,8 +22,8 @@ export class SelfTestOrchestrator {
     return 'all';
   }
 
-  // Which transport(s) a self-test entry is able to run against, derived from
-  // its manifest declarations rather than guessing from its label.
+  // Which transport a self-test entry runs against, derived from its manifest
+  // declaration rather than guessing from its label.
   entryTransport(entry, tool) {
     const explicit = this.normalizeTransport(entry?.selfTestTransport);
     if (explicit !== 'all') return explicit;
@@ -31,7 +31,7 @@ export class SelfTestOrchestrator {
     const fixed = this.normalizeTransport(tool?.fixedTransport);
     if (fixed !== 'all') return fixed;
 
-    return this.normalizeTransport(entry?.defaults?.transport);
+    return 'all';
   }
 
   shouldRunEntry(selectedTransport, entryTransport) {
@@ -40,12 +40,18 @@ export class SelfTestOrchestrator {
     return selectedTransport === entryTransport;
   }
 
-  // Narrows a tool's own transport param to the user's selection, but only
-  // when the entry itself is transport-agnostic (defaults.transport === 'both').
-  applySelectedTransport(params, selectedTransport) {
-    if (!Object.prototype.hasOwnProperty.call(params, 'transport')) return;
-    if (selectedTransport === 'all') return;
-    if (String(params.transport).toLowerCase() === 'both') {
+  shouldRunDraft(selectedDraft, entryDrafts) {
+    if (!selectedDraft || String(selectedDraft).toLowerCase() === 'all') return true;
+    return (entryDrafts || []).map(String).includes(String(selectedDraft));
+  }
+
+  // Use the entry's declared transport for split runs. For transport-agnostic
+  // tools, narrow a "both" default when the user selects one transport.
+  applySelectedTransport(params, selectedTransport, entryTransport, tool) {
+    if (!tool.parameters?.some((param) => param.id === 'transport')) return;
+    if (entryTransport !== 'all') {
+      params.transport = entryTransport;
+    } else if (selectedTransport !== 'all') {
       params.transport = selectedTransport;
     }
   }
@@ -62,7 +68,8 @@ export class SelfTestOrchestrator {
     const selectedTransport = this.normalizeTransport(config.transport);
     const tools = this.registry.getSelfTestTools().filter((tool) => {
       const entry = tool._selfTestEntry || {};
-      return this.shouldRunEntry(selectedTransport, this.entryTransport(entry, tool));
+      return this.shouldRunEntry(selectedTransport, this.entryTransport(entry, tool)) &&
+        this.shouldRunDraft(config.draft, entry.selfTestDrafts);
     });
     const startedAt = new Date().toISOString();
 
@@ -87,8 +94,12 @@ export class SelfTestOrchestrator {
         ...entry.defaults,
         relay_url: config.relayUrl,
       };
-      this.applySelectedTransport(params, selectedTransport);
-      if (config.draft && String(config.draft).toLowerCase() !== 'all') params.draft = config.draft;
+      this.applySelectedTransport(params, selectedTransport, this.entryTransport(entry, tool), tool);
+      if (config.draft && String(config.draft).toLowerCase() !== 'all') {
+        const draftParam = tool.parameters.find((param) =>
+          ['draft', 'draft_version'].includes(param.id));
+        if (draftParam) params[draftParam.id] = config.draft;
+      }
 
       onProgress(selfTestId, runLabel, 'running', { params });
 

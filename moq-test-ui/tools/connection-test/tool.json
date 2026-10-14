@@ -38,6 +38,6 @@
     "order": 1,
     "label": "Connection Test",
     "selfTestTransport": "all",
-    "defaults": {}
+    "selfTestDrafts": ["14", "16", "18"]
   }
 }
