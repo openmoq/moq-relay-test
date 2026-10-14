@@ -90,7 +90,7 @@ folly::Expected<std::shared_ptr<moxygen::SubgroupConsumer>,
                 moxygen::MoQPublishError>
 MockTrackConsumer::beginSubgroup(uint64_t groupID, uint64_t subgroupID,
                                  moxygen::Priority priority,
-                                 bool containsLastInGroup) {
+                                 moxygen::BeginSubgroupOptions options) {
   if (publishDone_received_) {
     LOG(ERROR) << "MockTrackConsumer::beginSubgroup called after publishDone!";
     return folly::makeUnexpected(moxygen::MoQPublishError(
@@ -98,7 +98,7 @@ MockTrackConsumer::beginSubgroup(uint64_t groupID, uint64_t subgroupID,
   }
   LOG(INFO) << "MockTrackConsumer::beginSubgroup - Group: " << groupID
             << ", Subgroup: " << subgroupID 
-            << ", containsLastInGroup: " << containsLastInGroup;
+            << ", containsLastInGroup: " << options.containsLastInGroup;
   return std::make_shared<MockSubgroupConsumer>();
 }
 

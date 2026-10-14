@@ -81,6 +81,7 @@ RUN apt-get update && \
         # Used in the staging step to strip embedded RPATH from the binary so
         # the runtime stage can resolve shared libs via /opt/moq/lib + ldconfig
         patchelf \
+        rsync \
     && rm -rf /var/lib/apt/lists/*
 
 # Use GCC — gcc-11 ships with build-essential on Ubuntu 22.04 and handles
@@ -113,7 +114,7 @@ COPY moqt_implementation/moxygen/scripts/ ./moqt_implementation/moxygen/scripts/
 # moqtest_server from the moxygen samples.  Both are needed by the conformance
 # target: moqtest_server connects to the relay as a publisher and
 # moqtest_client probes it.
-RUN --mount=type=cache,id=moq-interop-getdeps-v2,target=/var/cache/getdeps,sharing=locked \
+RUN --mount=type=cache,id=moq-interop-getdeps-v3,target=/var/cache/getdeps,sharing=locked \
     set -e; \
     cd /workspace/moqt_implementation/moxygen && bash scripts/setup-deps.sh; \
     mkdir -p /opt/moq/moxygen-tools; \
@@ -143,7 +144,7 @@ COPY moq-interop_tests/ ./moq-interop_tests/
 # build.sh emits ~2 MiB of verbose getdeps/cmake output that clips the log
 # before configure/link errors become visible.  Redirect to a file; on failure
 # the last 80 lines are printed so the actual error is always shown.
-RUN --mount=type=cache,id=moq-interop-getdeps-v2,target=/var/cache/getdeps,sharing=locked \
+RUN --mount=type=cache,id=moq-interop-getdeps-v3,target=/var/cache/getdeps,sharing=locked \
     set -e; \
     if [ -z "$(ls "$MOXYGEN_SCRATCH"/installed/folly/lib/libfolly.* 2>/dev/null)" ]; then \
         echo "==> BuildKit cache was evicted — re-running setup-deps.sh to repopulate..."; \

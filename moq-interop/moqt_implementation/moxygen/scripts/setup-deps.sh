@@ -6,9 +6,8 @@
 # deterministic scratch directory under the project root. Getdeps handles
 # all incrementality natively.
 #
-# Source patches (see PATCH section below) are applied to clones inside the
-# scratch dir which getdeps fetches fresh from upstream — they do NOT touch
-# the moxygen git submodule checked out at moqt_implementation/moxygen/moxygen.
+# moxygen is built from the pinned submodule (synced into getdeps' clone); the
+# small folly/glog patches below touch only the getdeps scratch dir.
 #
 # Usage:
 #   ./scripts/setup-deps.sh [--clean] [--scratch-path PATH]
@@ -77,77 +76,14 @@ echo "==> Install prefix: ${INSTALL_PREFIX}"
 echo "==> Building moxygen + Meta OSS deps (this may take a while on first run)..."
 cd "$MOXYGEN_DIR"
 
-# First attempt: build moxygen.  If it fails because MoQServer.cpp uses the
-# old proxygen::QuicWtSession::setHandler API (removed in newer proxygen builds),
-# apply a targeted source patch and retry.  The interop_tests binary is
-# client-only and does not link moxygen_moq_server, so removing the
-# setHandler call is safe for this build configuration.
-if ! python3 "$GETDEPS" "${GETDEPS_ARGS[@]}" build --no-tests $CLEAN_FLAG moxygen; then
-  MOXYGEN_SRC="$(python3 "$GETDEPS" "${GETDEPS_ARGS[@]}" show-source-dir moxygen 2>/dev/null | tail -1 || true)"
-  MOQSERVER="${MOXYGEN_SRC}/moxygen/MoQServer.cpp"
-  # Detect any state of the setHandler API-drift bug:
-  #   State A: original – setHandler call present (single- or two-line)
-  #   State B: previous partial patch – setHandler line deleted but
-  #             orphaned "moqSession.get());" remains on its own line
-  if [[ -f "$MOQSERVER" ]] && \
-     grep -qE 'setHandler|moqSession\.get\(\)\)' "$MOQSERVER"; then
-    echo "==> Patching MoQServer.cpp: removing setHandler call (proxygen API drift)"
-    python3 - "$MOQSERVER" << 'PATCH_EOF'
-import sys, re
-path = sys.argv[1]
-with open(path) as f:
-    content = f.read()
+# getdeps builds moxygen from its own upstream clone, not from the submodule.
+# Sync the pinned submodule into that clone; rsync -c copies only changed files
+# (fresh mtimes), so unchanged sources are not rebuilt.
+python3 "$GETDEPS" "${GETDEPS_ARGS[@]}" fetch --no-tests moxygen
+MOXYGEN_CLONE="$(python3 "$GETDEPS" "${GETDEPS_ARGS[@]}" show-source-dir moxygen | tail -1)"
+rsync -rlc --exclude=/.git --exclude=/build "$MOXYGEN_DIR/" "$MOXYGEN_CLONE/"
 
-patched = content
-
-# State A (two-line form): remove the whole call spanning two source lines
-patched = re.sub(
-    r'[ \t]*static_cast<proxygen::QuicWtSession\*>\(wtPtr\)->setHandler\(\n[ \t]*moqSession\.get\(\)\);[ \t]*\n',
-    '',
-    patched,
-)
-
-# State A' (single-line form)
-patched = re.sub(
-    r'[ \t]*static_cast<proxygen::QuicWtSession\*>\(wtPtr\)->setHandler\(moqSession\.get\(\)\);[ \t]*\n',
-    '',
-    patched,
-)
-
-# State B: setHandler line was already deleted by a previous tool run;
-# "moqSession.get());" is now an orphan on its own line (note the extra ')').
-patched = re.sub(
-    r'^[ \t]*moqSession\.get\(\)\);[ \t]*\n',
-    '',
-    patched,
-    flags=re.MULTILINE,
-)
-
-# Fallback: flexible pattern for any variation of setHandler call
-# Matches lines with setHandler regardless of exact whitespace/format
-if patched == content:
-    print("INFO: specific setHandler patterns did not match, trying flexible fallback...")
-    patched = re.sub(
-        r'^[ \t]*.*->setHandler\([^)]*\);[ \t]*\n',
-        '',
-        patched,
-        flags=re.MULTILINE,
-    )
-
-if patched == content:
-    print("WARNING: setHandler patch did not match any known pattern — skipping")
-else:
-    with open(path, 'w') as f:
-        f.write(patched)
-    print(f"Patched: {path}")
-PATCH_EOF
-    echo "==> Retrying moxygen build..."
-    python3 "$GETDEPS" "${GETDEPS_ARGS[@]}" build --no-tests $CLEAN_FLAG moxygen
-  else
-    echo "==> moxygen build failed for unknown reason" >&2
-    exit 1
-  fi
-fi
+python3 "$GETDEPS" "${GETDEPS_ARGS[@]}" build --no-tests $CLEAN_FLAG moxygen
 
 # Sanity check: the install tree should now exist at the deterministic prefix.
 MOXYGEN_INST="$(python3 "$GETDEPS" "${GETDEPS_ARGS[@]}" show-inst-dir moxygen 2>/dev/null | tail -1 || true)"

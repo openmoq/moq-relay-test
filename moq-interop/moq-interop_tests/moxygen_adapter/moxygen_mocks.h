@@ -111,7 +111,7 @@ public:
                   moxygen::MoQPublishError>
   beginSubgroup(uint64_t groupID, uint64_t subgroupID,
                 moxygen::Priority priority,
-                bool containsLastInGroup = false) override;
+                moxygen::BeginSubgroupOptions options = {}) override;
 
   folly::Expected<folly::SemiFuture<folly::Unit>, moxygen::MoQPublishError>
   awaitStreamCredit() override;
