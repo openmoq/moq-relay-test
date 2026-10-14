@@ -2,10 +2,10 @@
 # run_conformance.sh — Start moqtest_server connected to an external relay,
 # run conformance_test.sh against that same relay, then stop the server.
 #
-# Usage: run_conformance.sh <relay_url> [versions] [Q]
+# Usage: run_conformance.sh <relay_url> [versions] [Q|X]
 #   relay_url  Relay URL to test against, e.g. https://relay.example.com:9668/moq-relay
 #   versions   Comma-separated MoQT draft versions, e.g. "16"   (optional)
-#   Q          Use raw QUIC transport instead of WebTransport    (optional)
+#   Q|X        Raw QUIC (Q) or QMUX-on-TCP (X) instead of WebTransport (optional)
 #
 # The moqtest_server connects to the relay as a publisher, announces the
 # moq-test-00 namespace, and handles subscriptions forwarded by the relay.
@@ -23,15 +23,20 @@ fi
 
 RELAY_URL="$1"
 
-# ── Detect transport flag ────────────────────────────────────────────────────
-# The "Q" positional arg (any position after relay_url) switches to raw QUIC.
-SERVER_QUIC_TRANSPORT=false
-for arg in "$@"; do
-    [[ "$arg" == "Q" ]] && SERVER_QUIC_TRANSPORT=true
+# Same transport selector as conformance_test.sh: Q = raw QUIC, X = QMUX-on-TCP,
+# anything else = WebTransport.
+TRANSPORT=h3wt
+VERSIONS=
+for arg in "${@:2}"; do
+    case "$arg" in
+        Q) TRANSPORT=quic ;;
+        X) TRANSPORT=qmux ;;
+        *) VERSIONS="$arg" ;;
+    esac
 done
 
-SERVER_ARGS=(--relay_url="$RELAY_URL")
-"${SERVER_QUIC_TRANSPORT}" && SERVER_ARGS+=(--quic_transport="${SERVER_QUIC_TRANSPORT}")
+# Pin the server's relay leg to the same draft(s) the client tests.
+SERVER_ARGS=(--relay_url="$RELAY_URL" --transport="$TRANSPORT" --versions="$VERSIONS")
 
 # ── Ensure server binary exists ──────────────────────────────────────────────
 if [[ ! -x "$SERVER_BIN" ]]; then

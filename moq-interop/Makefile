@@ -27,7 +27,7 @@
 #
 #   The getdeps compile (folly/fizz/wangle/mvfst/proxygen/moxygen) takes
 #   30–60 minutes on a cold build.  BuildKit caches the result in a
-#   persistent cache volume (id=moq-interop-getdeps-v2) so subsequent
+#   persistent cache volume (id=moq-interop-getdeps-v3) so subsequent
 #   builds only recompile what changed in the interop tests source.
 #
 # Common variables (override on the command line)
@@ -110,7 +110,7 @@ DOCKERFILE := $(BUILD_CTX)/docker/Dockerfile
 DOCKER := docker
 # BuildKit is required for --mount=type=cache in the Dockerfile, which
 # persists the getdeps build tree (folly/fizz/wangle/mvfst/proxygen/moxygen)
-# across builds in a named cache volume (id=moq-interop-getdeps-v2).
+# across builds in a named cache volume (id=moq-interop-getdeps-v3).
 # BuildKit is the default backend since Docker 23.x; this export ensures it
 # is active on older Docker versions as well.
 export DOCKER_BUILDKIT := 1
@@ -180,7 +180,7 @@ shell: build
 
 # ── clean ─────────────────────────────────────────────────────────────────────────────────────
 # Removes the local Docker image.  Does NOT prune the BuildKit cache volume
-# (moq-interop-getdeps-v2); to wipe that too run:
+# (moq-interop-getdeps-v3); to wipe that too run:
 #   docker buildx prune --filter type=exec.cachemount --force
 clean:
 	$(DOCKER) rmi -f $(IMAGE_REF) 2>/dev/null || true
