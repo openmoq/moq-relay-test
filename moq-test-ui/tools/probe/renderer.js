@@ -111,7 +111,7 @@ export default class {
   getSummary() {
     if (this._totalProbes == null) return null;
     const down = this._totalProbes - this._liveProbes;
-    const base = `Probes: ${this._liveProbes} live / ${down} down`;
+    const base = `Probes: ${this._liveProbes} live`;
     return base;
   }
 

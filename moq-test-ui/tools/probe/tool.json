@@ -7,7 +7,7 @@
   "docker": {
     "image": "ghcr.io/gmarzot/aiomoqt:0.14.1",
     "entrypoint": ["/bin/sh", "-c"],
-    "command": ["python -m aiomoqt.tools.relay_probe --relays-file /tmp/relays.json -o /tmp/probe_out.json {build_args} && cat /tmp/probe_out.json && echo"],
+    "command": ["python -m aiomoqt.tools.relay_probe --draft 22,20,18,16,14 --relays-file /tmp/relays.json -o /tmp/probe_out.json {build_args} && cat /tmp/probe_out.json && echo"],
     "network": "host"
   },
   "prepareFiles": [
@@ -47,7 +47,7 @@
     "enabled": true,
     "order": 2,
     "selfTestTransport": "all",
-    "selfTestDrafts": ["14", "16", "18"],
+    "selfTestDrafts": ["14", "16", "18", "20", "22"],
     "defaults": {
       "transport": "both"
     }
