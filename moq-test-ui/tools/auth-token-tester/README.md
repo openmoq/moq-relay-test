@@ -62,6 +62,14 @@ are closed after each check; relay-side cleanup follows the relay's session
 handling. Use a test namespace/track when possible. TLS certificates are verified.
 Each connection/check has a 12-second deadline.
 
+For native QUIC, SETUP explicitly carries the URL's authority and path/query.
+An omitted port stays omitted in AUTHORITY; an explicit port is retained.
+This avoids aiomoqt's default `host:port` authority changing exact service
+matches (for example `relay.example` versus `relay.example:443`). PATH keeps
+its leading and trailing slashes. WebTransport routes through its HTTP CONNECT
+request and must not carry these options in MoQT SETUP. The report displays the
+requested authority and path; it cannot confirm the relay's selected service.
+
 Results stream as JSON snapshots to the table and raw output. Exit code 0
 means the diagnostic finished, not that every method was allowed.
 Invalid input or an unexpected runner failure exits nonzero.

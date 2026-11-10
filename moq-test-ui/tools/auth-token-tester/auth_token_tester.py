@@ -73,6 +73,7 @@ def validate_config(config):
     return {
         "url": url,
         "host": parsed.hostname,
+        "authority": parsed.netloc,
         "port": port,
         "path": urlunsplit(("", "", parsed.path or "/", parsed.query, "")),
         "draft": int(config["draft_version"]),
@@ -124,9 +125,16 @@ async def probe(method, target, token, client_factory=MOQTClient):
                 supported_drafts=target["draft"],
             )
             async with client.connect() as session:
+                setup_parameters = {SetupParamType.AUTH_TOKEN: token}
+                if target["transport"] == "quic":
+                    # Preserve URI routing instead of aiomoqt's host:port default.
+                    setup_parameters.update({
+                        SetupParamType.AUTHORITY: target["authority"],
+                        SetupParamType.PATH: target["path"],
+                    })
                 await session.client_session_init(
                     timeout=TIMEOUT - 2,
-                    parameters={SetupParamType.AUTH_TOKEN: token},
+                    parameters=setup_parameters,
                 )
                 if session.negotiated_draft != target["draft"]:
                     raise ValueError(f"Relay negotiated unexpected draft {session.negotiated_draft}")

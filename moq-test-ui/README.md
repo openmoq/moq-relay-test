@@ -38,6 +38,13 @@ npm start
 
 Open http://localhost:3000.
 
+## Versioning
+
+The header displays the version from `package.json`; it is not maintained
+separately in the UI. Use semantic versions and bump the package metadata and
+lockfile together, for example with `npm version patch --no-git-tag-version`.
+For a release, create a matching `vX.Y.Z` Git tag after committing the bump.
+
 ## Auth Token Generator
 
 Action Presets offers All, Publish only (the default), and Subscribe only action

@@ -43,7 +43,33 @@ class App {
     this.ws.on('disconnected', () => this.onDisconnected());
 
     this.bindUI();
+    this.loadVersion();
     this.ws.connect();
+  }
+
+  async loadVersion() {
+    const versionElement = document.getElementById('app-version');
+    if (!versionElement) {
+      console.error('Application version element was not found.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/version');
+      if (!response.ok) {
+        throw new Error(`Version request failed with status ${response.status}`);
+      }
+
+      const { version } = await response.json();
+      if (typeof version !== 'string' || !version.trim()) {
+        throw new Error('Version response did not contain a valid version.');
+      }
+
+      versionElement.textContent = `v${version}`;
+    } catch (error) {
+      console.error('Unable to load application version:', error);
+      versionElement.textContent = 'Version unavailable';
+    }
   }
 
   initEndpointDefaults() {

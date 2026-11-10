@@ -38,7 +38,7 @@ export default class {
     this.report = report;
     this.context.textContent = report.error
       ? `Token test failed: ${report.error}`
-      : `${report.url} | ${report.transport} | Draft ${report.draft} | Token type: ${report.token_type ?? 0} | Namespace: ${report.namespace} | Track: ${report.track}`;
+      : `${report.url} | ${report.transport} | Authority: ${report.authority ?? '-'} | Path: ${report.path ?? '-'} | Draft ${report.draft} | Token type: ${report.token_type ?? 0} | Namespace: ${report.namespace} | Track: ${report.track}`;
     this.renderRows();
   }
 

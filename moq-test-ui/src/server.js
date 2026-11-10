@@ -1,6 +1,7 @@
 import express from 'express';
 import http from 'http';
 import path from 'path';
+import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import { ToolRegistry } from './tool-registry.js';
 import { DockerExecutor } from './docker-executor.js';
@@ -10,6 +11,7 @@ import { createWSServer } from './ws-server.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
+const { version } = createRequire(import.meta.url)('../package.json');
 
 const app = express();
 const server = http.createServer(app);
@@ -34,6 +36,11 @@ app.use(express.static(path.join(ROOT, 'public')));
 
 // Serve tool renderers
 app.use('/tools', express.static(path.join(ROOT, 'tools')));
+
+// API: application version
+app.get('/api/version', (req, res) => {
+  res.set('Cache-Control', 'no-store').json({ version });
+});
 
 // API: list tools
 app.get('/api/tools', (req, res) => {

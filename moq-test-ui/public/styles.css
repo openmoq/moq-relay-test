@@ -53,6 +53,14 @@ header {
 
 header nav { display: flex; gap: 0.25rem; margin-left: 1rem; }
 
+.app-version {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
 .nav-btn {
   background: transparent;
   border: 1px solid transparent;
@@ -69,7 +77,7 @@ header nav { display: flex; gap: 0.25rem; margin-left: 1rem; }
 .status-dot {
   width: 10px; height: 10px;
   border-radius: 50%;
-  margin-left: auto;
+  margin-left: 0;
 }
 .status-dot.connected { background: var(--green); }
 .status-dot.disconnected { background: var(--red); }

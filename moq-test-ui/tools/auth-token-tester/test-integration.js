@@ -86,6 +86,7 @@ test('renderer shows seven rows, literal untrusted details and incomplete/failur
     const report = {
       type: 'auth-token-test', url: 'https://relay.example', transport: 'wt',
       draft: 16, token_type: 16, namespace: 'live', track: 'video',
+      authority: 'relay.example', path: '/moq-relay',
       tests: Object.fromEntries(methods.map((method, index) => [
         method, { allowed: index === 0, detail: '<img src=x onerror=alert(1)>', latency_ms: 2 },
       ])),
@@ -93,6 +94,7 @@ test('renderer shows seven rows, literal untrusted details and incomplete/failur
     renderer.onLine('[runner] starting');
     renderer.onLine(JSON.stringify(report));
     assert.match(renderer.context.textContent, /Token type: 16/);
+    assert.match(renderer.context.textContent, /Authority: relay.example \| Path: \/moq-relay/);
     assert.equal(renderer.body.children[0].children[1].textContent, 'Allowed');
     assert.equal(renderer.body.children[1].children[1].textContent, 'Unknown');
     assert.equal(renderer.body.children[1].children[2].textContent, 'Not accepted');

@@ -6,11 +6,13 @@ import socket
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from aiomoqt.client import MOQTClient
 from aiomoqt.messages import RequestOk
+from aiomoqt.protocol import _MOQTSessionMixin
 from aiomoqt.server import MOQTServer
-from aiomoqt.types import MOQTException, MOQTMessageType, MOQTRequestError, ParamType, RequestErrorCode
+from aiomoqt.types import MOQTException, MOQTMessageType, MOQTRequestError, ParamType, RequestErrorCode, SetupParamType
 from aiomoqt.utils.certs import generate_self_signed
 
 import auth_token_tester as tester
@@ -115,6 +117,26 @@ class TesterTests(unittest.IsolatedAsyncioTestCase):
             if call[0] != "connect":
                 kwargs = call[1] if call[0] == "client_setup" else call[2]
                 self.assertEqual(kwargs["parameters"][ParamType.AUTH_TOKEN].token_type, 16)
+
+    async def test_quic_setup_preserves_url_authority_and_path(self):
+        for authority in ("relay.example", "relay.example:443", "relay.example:4443", "[::1]", "[::1]:4443"):
+            for path in ("/moq-relay", "/moq-relay/", "/moq-relay?route=live"):
+                with self.subTest(authority=authority, path=path):
+                    FakeClient.calls = []
+                    report = await self.run_quietly(config(relay_url=f"https://{authority}{path}"))
+                    self.assertEqual(report["authority"], authority)
+                    self.assertEqual(report["path"], path)
+                    for call in FakeClient.calls:
+                        if call[0] == "client_setup":
+                            params = call[1]["parameters"]
+                            self.assertEqual(params[SetupParamType.AUTHORITY], authority)
+                            self.assertEqual(params[SetupParamType.PATH], path)
+        FakeClient.calls = []
+        await self.run_quietly(config(transport="wt"))
+        for call in FakeClient.calls:
+            if call[0] == "client_setup":
+                self.assertNotIn(SetupParamType.AUTHORITY, call[1]["parameters"])
+                self.assertNotIn(SetupParamType.PATH, call[1]["parameters"])
 
     async def test_errors_are_never_inferred_as_allowed_and_do_not_block_other_methods(self):
         FakeClient.errors = {
@@ -256,8 +278,28 @@ class WireTests(unittest.IsolatedAsyncioTestCase):
                                 draft_version=str(draft), transport=transport, track_name="video",
                                 token_type=16,
                             )
-                            with contextlib.redirect_stdout(io.StringIO()):
+                            setup_options = []
+                            original_send = _MOQTSessionMixin.send_control_message
+
+                            def record_setup(session, message, *args, **kwargs):
+                                if session._is_client and type(message).__name__ in ("ClientSetup", "Setup"):
+                                    setup_options.append(
+                                        getattr(message, "options", None) or message.parameters,
+                                    )
+                                return original_send(session, message, *args, **kwargs)
+
+                            with contextlib.redirect_stdout(io.StringIO()), patch.object(
+                                _MOQTSessionMixin, "send_control_message", record_setup,
+                            ):
                                 report = await tester.run(cfg, client_factory)
+                            self.assertEqual(len(setup_options), 7)
+                            for options in setup_options:
+                                if transport == "quic":
+                                    self.assertEqual(options[SetupParamType.AUTHORITY], f"localhost:{port}")
+                                    self.assertEqual(options[SetupParamType.PATH], "/moq")
+                                else:
+                                    self.assertNotIn(SetupParamType.AUTHORITY, options)
+                                    self.assertNotIn(SetupParamType.PATH, options)
                             self.assertEqual(
                                 [m for m, r in report["tests"].items() if not r["allowed"]],
                                 [], report,
