@@ -9,6 +9,8 @@ class App {
   constructor() {
     this.endpointCookieName = 'moq_test_ui_endpoint_url';
     this.endpointQueryValue = null;
+    this.toolQueryName = null;
+    this.toolQuerySelectionHandled = false;
     this.autoRunRequested = false;
     this.defaultEndpointUrl = '';
     this.autoRunSelfTestStarted = false;
@@ -74,6 +76,7 @@ class App {
 
   initEndpointDefaults() {
     const query = new URLSearchParams(window.location.search);
+    this.toolQueryName = query.get('tool')?.trim() || null;
     const endpoint =
       query.get('endpoint') ||
       query.get('endpoint_url') ||
@@ -261,6 +264,14 @@ class App {
     this.renderToolList();
     this.selfTestUI.setTools(this.tools);
     this.historyUI.setTools(this.tools);
+    if (this.toolQueryName && !this.toolQuerySelectionHandled) {
+      this.toolQuerySelectionHandled = true;
+      if (this.tools.some(tool => tool.name === this.toolQueryName)) {
+        this.selectTool(this.toolQueryName);
+      } else {
+        console.warn(`Ignoring unknown tool name in query parameter: ${this.toolQueryName}`);
+      }
+    }
     this.maybeAutoRunSelfTest();
   }
 
