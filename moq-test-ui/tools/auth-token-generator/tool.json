@@ -59,8 +59,8 @@
       "id": "auth_track",
       "label": "Auth Track",
       "type": "text",
-      "required": true,
-      "default": "video",
+      "required": false,
+      "default": "",
       "placeholder": "video",
       "description": "The track to authorize the actions against."
     }

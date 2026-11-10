@@ -145,7 +145,18 @@ export class DockerExecutor {
     if (!tool.buildCommand) return [];
 
     const effectiveParams = this._applyTransportTransforms(tool, params);
-    const cmd = tool.buildCommand.replace(/\{(\w+)\}/g, (_, key) => {
+    const command = tool.buildCommand.replace(
+      /(^|\s)(-{1,2}[\w-]+)\s+\{(\w+)\}(?=\s|$)/g,
+      (match, whitespace, _flag, key) => {
+        const param = tool.parameters?.find(candidate => candidate.id === key);
+        const value = effectiveParams[key];
+        if (param && !param.required && (value === undefined || value === null || value === '')) {
+          return whitespace;
+        }
+        return match;
+      },
+    );
+    const cmd = command.replace(/\{(\w+)\}/g, (_, key) => {
       return effectiveParams[key] !== undefined ? String(effectiveParams[key]) : '';
     });
     // Split on whitespace; drop empty tokens AND --flag= tokens where the
