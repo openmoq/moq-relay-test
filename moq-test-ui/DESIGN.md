@@ -66,6 +66,11 @@ Each tool can define:
 - optional `selfTest` configuration
 - optional generated input files via `prepareFiles`
 
+A select parameter can declare `presetTarget` to fill another input with its
+selected option value and make it read-only. An empty option value enables manual
+editing without clearing the target. Parameter widths use `sm`, `md`, `lg`, and
+`full` for quarter, half, three-quarter, and full rows.
+
 ### Docker Execution
 
 The Docker executor is responsible for container lifecycle and output streaming.

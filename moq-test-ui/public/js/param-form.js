@@ -110,6 +110,21 @@ export class ParamForm {
 
       formEl.appendChild(group);
     }
+
+    for (const param of params) {
+      if (!param.presetTarget) continue;
+
+      const select = formEl.querySelector(`#param-${param.id}`);
+      const target = formEl.querySelector(`#param-${param.presetTarget}`);
+      if (!target) throw new Error(`Unknown preset target: ${param.presetTarget}`);
+
+      const applyPreset = () => {
+        target.readOnly = select.value !== '';
+        if (target.readOnly) target.value = select.value;
+      };
+      select.addEventListener('change', applyPreset);
+      applyPreset();
+    }
   }
 
   getValues() {

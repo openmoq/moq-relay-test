@@ -14,6 +14,7 @@
       "id": "auth_service",
       "label": "Auth Service",
       "type": "text",
+      "width": "sm",
       "required": true,
       "default": "live",
       "placeholder": "e.g., live",
@@ -23,6 +24,7 @@
       "id": "auth_key_id",
       "label": "Auth Key ID",
       "type": "text",
+      "width": "sm",
       "required": true,
       "default": "cat-dev",
       "placeholder": "e.g., cat-dev",
@@ -38,9 +40,25 @@
       "description": "The secret key associated with the Key ID."
     },
     {
+      "id": "action_presets",
+      "label": "Action Presets",
+      "type": "select",
+      "width": "sm",
+      "default": "client_setup,publish_namespace,publish",
+      "presetTarget": "auth_actions",
+      "options": [
+        { "value": "", "label": "Custom" },
+        { "value": "client_setup,server_setup,publish_namespace,subscribe_namespace,subscribe,request_update,publish,fetch,track_status", "label": "All" },
+        { "value": "client_setup,publish_namespace,publish", "label": "Publish only" },
+        { "value": "client_setup,subscribe_namespace,subscribe,fetch", "label": "Subscribe only" }
+      ],
+      "description": "Choose a preset or Custom to enter actions manually."
+    },
+    {
       "id": "auth_actions",
       "label": "Auth Actions",
       "type": "text",
+      "width": "lg",
       "required": true,
       "default": "client_setup,publish_namespace,publish",
       "placeholder": "client_setup,publish_namespace,publish",
@@ -51,7 +69,7 @@
       "label": "Auth Namespace",
       "type": "text",
       "required": true,
-      "default": "live/event/main",
+      "default": "",
       "placeholder": "live/event/main",
       "description": "The namespace to authorize the actions against."
     },

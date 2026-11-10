@@ -1,0 +1,101 @@
+{
+  "name": "auth-token-tester",
+  "displayName": "Auth Token Tester",
+  "description": "Tests seven MoQT requests, separating authorization from request results. Missing namespace/track errors for subscribe/fetch/track_status indicate inferred authorization on relays like moqx that authorize before lookup. This sends real announcements.",
+  "category": "authentication",
+  "order": 5,
+  "docker": {
+    "image": "ghcr.io/gmarzot/aiomoqt:0.14.1",
+    "entrypoint": ["python"],
+    "command": ["/tmp/auth_token_tester.py", "--config", "/tmp/auth_token_test.json"],
+    "network": "host"
+  },
+  "prepareFiles": [
+    {
+      "containerPath": "/tmp/auth_token_tester.py",
+      "file": "auth_token_tester.py",
+      "silent": true
+    },
+    {
+      "containerPath": "/tmp/auth_token_test.json",
+      "generator": "auth-token-test-config",
+      "silent": true
+    }
+  ],
+  "parameters": [
+    {
+      "id": "relay_url",
+      "label": "Relay URL",
+      "type": "url",
+      "required": true,
+      "default": "",
+      "placeholder": "https://relay.example.com/moq-relay"
+    },
+    {
+      "id": "transport",
+      "label": "Transport",
+      "type": "select",
+      "required": true,
+      "default": "wt",
+      "options": [
+        { "value": "quic", "label": "QUIC" },
+        { "value": "wt", "label": "WebTransport (H3)" }
+      ]
+    },
+    {
+      "id": "draft_version",
+      "label": "Draft Version",
+      "type": "select",
+      "required": true,
+      "default": "16",
+      "options": [
+        { "value": "14", "label": "Draft 14" },
+        { "value": "16", "label": "Draft 16" },
+        { "value": "18", "label": "Draft 18" },
+        { "value": "20", "label": "Draft 20" },
+        { "value": "22", "label": "Draft 22" }
+      ]
+    },
+    {
+      "id": "namespace",
+      "label": "Namespace",
+      "type": "text",
+      "required": true,
+      "default": "",
+      "placeholder": "live/event/main",
+      "description": "Slash-separated namespace components; escape a literal slash with \\/."
+    },
+    {
+      "id": "track_name",
+      "label": "Track Name",
+      "type": "text",
+      "required": false,
+      "default": "",
+      "placeholder": "video",
+      "description": "Optional. If omitted, a temporary track name is generated; track-scoped tokens may not cover it."
+    },
+    {
+      "id": "token_type",
+      "label": "Token Type",
+      "type": "number",
+      "required": true,
+      "default": 16,
+      "min": 0,
+      "max": 9007199254740991,
+      "step": 1,
+      "description": "Must match the relay's auth.token_type."
+    },
+    {
+      "id": "auth_token",
+      "label": "Token",
+      "type": "textarea",
+      "required": true,
+      "default": "",
+      "description": "Paste base64: output from Auth Token Generator, hex: bytes, or a plain UTF-8 token. Not saved in history or printed in logs."
+    }
+  ],
+  "buildCommand": "",
+  "renderer": "renderer.js",
+  "persistResults": false,
+  "selfTest": { "enabled": false }
+}

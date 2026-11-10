@@ -38,6 +38,28 @@ npm start
 
 Open http://localhost:3000.
 
+## Auth Token Generator
+
+Action Presets offers All, Publish only (the default), and Subscribe only action
+lists. Select Custom to edit Auth Actions manually; switching to Custom retains
+the current list. Preset action lists are comma-separated without spaces for CLI
+compatibility.
+
+## Auth Token Tester
+
+Available immediately below Auth Token Generator. Select a relay URL, transport,
+draft, namespace, optional track name, and token to check all seven supported
+actions in a table separating authorization from request results. A temporary
+track name is generated when omitted. Subscribe/fetch/track_status missing-resource responses
+show Allowed (inferred) / Namespace/track not found: moqx authorizes before lookup,
+but this does not prove token validity. Timeouts and unsupported requests show
+Unknown rather than an authorization denial.
+This sends real announcements but publishes no objects; tokens are not saved
+in history or printed in command logs.
+Set Token Type to match the relay's `auth.token_type` (for example, 16);
+this is separate from Draft Version and the token's `base64:` prefix.
+See [Auth Token Tester](./tools/auth-token-tester/README.md) for details.
+
 ## CI/CD Workflow (Implemented)
 
 The project now includes an implemented GitHub Actions workflow at [../.github/workflows/moq-test-ui-image.yml](../.github/workflows/moq-test-ui-image.yml).

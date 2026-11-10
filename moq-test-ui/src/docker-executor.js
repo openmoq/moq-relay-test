@@ -39,6 +39,10 @@ export class DockerExecutor {
     if (name === 'relay-probe-endpoints') {
       return this._genRelayProbeEndpoints(params);
     }
+    if (name === 'auth-token-test-config') {
+      const { relay_url, transport, draft_version, namespace, track_name, auth_token, token_type } = params;
+      return JSON.stringify({ relay_url, transport, draft_version, namespace, track_name, auth_token, token_type });
+    }
     throw new Error(`Unknown prepareFiles generator: ${name}`);
   }
 
