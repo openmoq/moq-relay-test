@@ -3,7 +3,7 @@
   "displayName": "MOQ Protocol Test",
   "description": "Runs the MoQ interoperability test (https://github.com/openmoq/moq-relay-test/blob/main/moq-interop/moq-interop_tests/README.MD) against a relay, testing protocol-level operations like goaway, subscribe, publish, fetch, and error handling.",
   "category": "conformance",
-  "order": 1,
+  "order": 2,
   "fixedTransport": "wt",
   "forceUrlScheme": "https",
   "docker": {
@@ -21,6 +21,25 @@
       "default": "",
       "placeholder": "https://relay.example.com/moq-relay",
       "description": "Relay URL for interop testing"
+    },
+    {
+      "id": "draft",
+      "label": "Draft Version",
+      "type": "select",
+      "options": [
+        { "value": "16", "label": "Draft 16" }
+      ],
+      "default": "16"
+    },
+    {
+      "id": "transport",
+      "label": "Transport",
+      "type": "select",
+      "options": [
+        { "value": "wt", "label": "WebTransport (H3)" }
+      ],
+      "default": "wt",
+      "rewriteUrlScheme": true
     },
     {
       "id": "tests",
@@ -44,6 +63,7 @@
       "order": 3,
       "label": "MOQ Protocol Test (WebTransport)",
       "selfTestTransport": "WT",
+      "selfTestDrafts": ["16"],
       "defaults": {
         "tests": "GoawayTest,MaxRequestIdTest,PublishNamespaceDoneTest,PublishNamespaceTest,PublishTest,SubscribeErrorTest,SubscribeNamespaceTest,SubscribeTest,SubscribeUpdateTest"
       }

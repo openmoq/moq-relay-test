@@ -5,9 +5,9 @@
   "category": "diagnostics",
   "order": 2,
   "docker": {
-    "image": "ghcr.io/gmarzot/aiomoqt:0.10.6",
+    "image": "ghcr.io/gmarzot/aiomoqt:0.14.1",
     "entrypoint": ["/bin/sh", "-c"],
-    "command": ["python /app/aiomoqt/examples/relay_probe.py -f /tmp/relays.json -o /tmp/probe_out.json {build_args} && cat /tmp/probe_out.json && echo"],
+    "command": ["python -m aiomoqt.tools.relay_probe --draft 22,20,18,16,14 --relays-file /tmp/relays.json -o /tmp/probe_out.json {build_args} && cat /tmp/probe_out.json && echo"],
     "network": "host"
   },
   "prepareFiles": [
@@ -47,6 +47,7 @@
     "enabled": true,
     "order": 2,
     "selfTestTransport": "all",
+    "selfTestDrafts": ["14", "16", "18", "20", "22"],
     "defaults": {
       "transport": "both"
     }

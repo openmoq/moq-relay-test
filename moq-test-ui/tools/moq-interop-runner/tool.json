@@ -3,7 +3,7 @@
   "displayName": "MOQ Interop Runner",
   "description": "Runs aiomoqt's moq_interop_client interoperability suite with TAP output against a relay.",
   "category": "conformance",
-  "order": 3,
+  "order": 1,
   "docker": {
     "image": "ghcr.io/gmarzot/aiomoqt:0.10.6",
     "entrypoint": ["/bin/sh", "-c"],
@@ -63,20 +63,14 @@
       "order": 6,
       "label": "MOQ Interop Runner (QUIC)",
       "selfTestTransport": "Q",
-      "defaults": {
-        "draft_version": "16",
-        "transport": "quic"
-      }
+      "selfTestDrafts": ["14", "16", "18"]
     },
     {
       "enabled": true,
       "order": 7,
       "label": "MOQ Interop Runner (WebTransport)",
       "selfTestTransport": "WT",
-      "defaults": {
-        "draft_version": "16",
-        "transport": "wt"
-      }
+      "selfTestDrafts": ["14", "16", "18"]
     }
   ]
 }

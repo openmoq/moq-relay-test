@@ -95,11 +95,11 @@
   "selfTest": {
     "enabled": true,
     "order": 8,
+    "selfTestDrafts": ["14", "16"],
     "defaults": {
       "sub_mbps": 10,
       "step_mbps": 10,
       "max_mbps": 10000,
-      "draft": "16",
       "interval": 5,
       "duration": 60
     }
